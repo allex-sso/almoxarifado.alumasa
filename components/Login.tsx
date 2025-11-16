@@ -33,8 +33,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     <>
       <div className="min-h-screen flex flex-col items-center justify-center bg-alumasa-deep-blue text-white p-4">
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold">Alumasa</h1>
-          <p className="text-lg text-gray-300 mt-2">Controle do Almoxarifado</p>
+            <h1 className="text-5xl font-bold text-white mb-2">Alumasa</h1>
+            <p className="text-lg text-gray-300">Controle do Almoxarifado</p>
         </div>
         
         <div className="max-w-sm w-full bg-white rounded-lg shadow-xl p-8 text-gray-800">

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { StockItem, User } from '../types';
@@ -5,15 +6,11 @@ import { StockItem, User } from '../types';
 interface HeaderProps {
     user?: User;
     stockItems: StockItem[];
-    searchTerm: string;
-    setSearchTerm: (term: string) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, stockItems, searchTerm, setSearchTerm }) => {
+const Header: React.FC<HeaderProps> = ({ user, stockItems }) => {
     const [avatarUrl, setAvatarUrl] = useState('https://i.pravatar.cc/150?u=admin@alumasa.com');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const navigate = useNavigate();
-    const location = useLocation();
     
     const itemsAbaixoMinimoCount = stockItems.filter(i => i.systemStock <= i.minStock).length;
 
@@ -30,32 +27,10 @@ const Header: React.FC<HeaderProps> = ({ user, stockItems, searchTerm, setSearch
         }
     };
     
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-        if (location.pathname !== '/estoque/atual') {
-            navigate('/estoque/atual');
-        }
-    };
-
     return (
         <header className="flex items-center justify-between px-6 bg-white border-b h-16 shadow-sm flex-shrink-0">
-            <div className="flex items-center">
-                {/* Hamburger for mobile can be added here */}
-            </div>
-
-            <div className="flex items-center w-full">
-                 <div className="relative text-gray-500 w-full max-w-md">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21L15.803 15.803M15.803 15.803A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
-                    </span>
-                    <input 
-                        className="block w-full bg-white border border-gray-200 rounded-md py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                        type="search" 
-                        placeholder="Buscar item por código ou descrição..." 
-                        value={searchTerm}
-                        onChange={handleSearchChange}
-                    />
-                </div>
+            <div className="flex-grow">
+                {/* This div pushes the content to the right */}
             </div>
 
             <div className="flex items-center space-x-5 ml-4 flex-shrink-0">

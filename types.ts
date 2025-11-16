@@ -12,7 +12,7 @@ export interface StockItem {
   minStock: number;
   value: number;
   countedStock?: number;
-  supplier?: string;
+  supplier?: string | string[];
 }
 
 export interface BaseItemHistory {

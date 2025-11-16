@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StockItem, ItemHistory, Supplier } from '../types';
@@ -135,28 +137,32 @@ interface EstoquePageProps {
     stockItems: StockItem[];
     setStockItems: React.Dispatch<React.SetStateAction<StockItem[]>>;
     suppliers: Supplier[];
-    searchTerm: string;
     addAuditLog: (action: string) => void;
     showToast: (message: string) => void;
     historyData: Record<string, ItemHistory[]>;
 }
 
-const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, suppliers, searchTerm, addAuditLog, showToast, historyData }) => {
+// FIX: Exported the EstoquePage component to make it available for import in other modules.
+export const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, suppliers, addAuditLog, showToast, historyData }) => {
   const [displayedItems, setDisplayedItems] = useState<StockItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState<StockItem | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState<StockItem | null>(null);
-  const [showEditModal, setShowEditModal] = useState<StockItem | null>(null);
+  
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editedItemData, setEditedItemData] = useState<Partial<StockItem>>({});
+  const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
+  
   const [showQrModal, setShowQrModal] = useState<StockItem | null>(null);
   const [showMultiQrModal, setShowMultiQrModal] = useState(false);
-  const [editedItem, setEditedItem] = useState<StockItem | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const location = useLocation();
   const navigate = useNavigate();
 
   // State for adding a new item
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [isAddItemPanelOpen, setIsAddItemPanelOpen] = useState(false);
   const initialNewItemState: Partial<StockItem> = {
       code: '',
       description: '',
@@ -184,6 +190,20 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
   const multiQrModalContentRef = useRef<HTMLDivElement>(null);
 
   const ITEMS_PER_PAGE = 10;
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (!(event.target as HTMLElement).closest('[data-menu-container="true"]')) {
+            setActiveActionMenu(null);
+        }
+    };
+    if (activeActionMenu) {
+        document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeActionMenu]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -236,25 +256,35 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
       }
   };
 
-  const handleOpenEditModal = (item: StockItem) => {
-    setEditedItem({ ...item });
-    setShowEditModal(item);
+  const handleStartEdit = (item: StockItem) => {
+    setEditingItemId(item.id);
+    setEditedItemData(item);
+    setActiveActionMenu(null);
+  };
+  
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditedItemData({});
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingItemId) return;
+    addAuditLog(`Editou o item ${editedItemData.code}.`);
+    setStockItems(prev => 
+      prev.map(item => 
+        item.id === editingItemId ? { ...item, ...editedItemData } : item
+      )
+    );
+    showToast(`Item ${editedItemData.code} atualizado!`);
+    handleCancelEdit();
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    if (!editedItem) return;
     const { name, value } = e.target;
-    setEditedItem(prev => prev ? { ...prev, [name]: (name === 'minStock' || name === 'value') ? parseFloat(value) : value } : null);
-  };
-
-  const handleConfirmEdit = () => {
-    if (editedItem) {
-      addAuditLog(`Editou o item ${editedItem.code}.`);
-      setStockItems(prev => prev.map(item => item.id === editedItem.id ? editedItem : item));
-      showToast(`Item ${editedItem.code} atualizado!`);
-      setShowEditModal(null);
-      setEditedItem(null);
-    }
+    setEditedItemData(prev => ({
+        ...prev,
+        [name]: (name === 'minStock' || name === 'value') ? parseFloat(value) : value
+    }));
   };
 
   const handleAddItemChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -270,12 +300,18 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
     }
     setNewItem(prev => ({ ...prev, [name]: value }));
   };
+  
+  const closeAddItemPanel = () => {
+    setIsAddItemPanelOpen(false); 
+    setAddFormError(''); 
+    setCodeError(''); 
+    setNewItem(initialNewItemState);
+  }
 
   const handleConfirmAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     setAddFormError('');
 
-    // Re-run validation for code on submit
     const code = newItem.code || '';
     if (!code) {
         setCodeError('O código é obrigatório.');
@@ -290,7 +326,6 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
       return;
     }
     
-    // Clear code error if it passes all checks on submit
     setCodeError('');
 
     if (!newItem.description || !newItem.location) {
@@ -314,11 +349,8 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
     addAuditLog(`Criou o item ${itemToAdd.code} - ${itemToAdd.description}.`);
     setStockItems(prev => [itemToAdd, ...prev]);
     
-    setShowAddItemModal(false);
-    setNewItem(initialNewItemState);
-    setAddFormError('');
-    setCodeError('');
-    showToast(`Item ${itemToAdd.code} adicionado com sucesso!`);
+    closeAddItemPanel();
+    showToast(`Item adicionado com sucesso!`);
   };
 
   const handlePrint = (contentRef: React.RefObject<HTMLDivElement>) => {
@@ -445,11 +477,9 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
         if (inQuotes) {
             if (char === '"') {
                 if (i + 1 < row.length && row[i + 1] === '"') {
-                    // Escaped quote
                     currentField += '"';
-                    i++; // Skip next char
+                    i++;
                 } else {
-                    // Closing quote
                     inQuotes = false;
                 }
             } else {
@@ -479,7 +509,6 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
         let text = e.target?.result as string;
         if (!text) return;
 
-        // Remove BOM
         if (text.charCodeAt(0) === 0xFEFF) {
             text = text.substring(1);
         }
@@ -578,11 +607,20 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">Estoque Atual</h1>
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-4">
-            <div>
-                 <p className="text-gray-600">Valor Total Consolidado (com base nos filtros)</p>
-                 <p className="text-2xl font-bold text-blue-600">{totalValue.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</p>
+            <div className="relative text-gray-500 w-full max-w-md">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21L15.803 15.803M15.803 15.803A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
+                </span>
+                <input 
+                    className="block w-full bg-white border border-gray-200 rounded-md py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    type="search" 
+                    placeholder="Buscar item por código ou descrição..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-4">
+                 <p className="text-gray-600 text-sm hidden md:block">Total (filtrado): <span className="font-bold text-blue-600">{totalValue.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span></p>
                  <button
                   onClick={() => setShowMultiQrModal(true)}
                   disabled={selectedItems.length === 0}
@@ -590,8 +628,8 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
                 >
                   Gerar Etiquetas ({selectedItems.length})
                 </button>
-                <button onClick={() => setShowBulkImportModal(true)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">Importar em Massa</button>
-                <button onClick={() => setShowAddItemModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md">+ Novo Item</button>
+                <button onClick={() => setShowBulkImportModal(true)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">Importar</button>
+                <button onClick={() => setIsAddItemPanelOpen(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md">+ Novo Item</button>
             </div>
         </div>
         
@@ -613,59 +651,96 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
         )}
 
         <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[1024px]">
             <thead>
                 <tr className="bg-gray-50 border-b">
                 <th className="p-3 w-4"><input type="checkbox" onChange={handleSelectAll} checked={displayedItems.length > 0 && selectedItems.length === displayedItems.length} /></th>
                 <th className="p-3 text-sm font-semibold text-gray-600">CÓDIGO</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">DESCRIÇÃO</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">EQUIPAMENTO</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">LOCALIZAÇÃO</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">MEDIDA</th>
+                <th className="p-3 text-sm font-semibold text-gray-600">ESTOQUE MÍN.</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">VALOR UNIT.</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">AÇÕES</th>
+                <th className="p-3 text-sm font-semibold text-gray-600 text-center">AÇÕES</th>
                 </tr>
             </thead>
             <tbody>
                 {paginatedItems.map(item => (
-                <tr key={item.id} className={`border-b ${item.systemStock <= item.minStock ? 'bg-red-50' : ''}`}>
+                <tr key={item.id} className={`border-b transition-colors duration-200 ${item.id === editingItemId ? 'bg-blue-50' : (item.systemStock <= item.minStock ? 'bg-red-50' : '')}`}>
                     <td className="p-3"><input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => handleSelectItem(item.id)} /></td>
                     <td className="p-3 text-sm text-gray-800 font-medium">
-                    {item.systemStock <= item.minStock && <span className="inline-block w-2.5 h-2.5 bg-red-500 rounded-full mr-2" title="Estoque baixo"></span>}
-                    {item.code}
+                        {item.systemStock <= item.minStock && <span className="inline-block w-2.5 h-2.5 bg-red-500 rounded-full mr-2" title="Estoque baixo"></span>}
+                        {item.code}
                     </td>
-                    <td className="p-3 text-sm text-gray-500">{item.description}</td>
-                    <td className="p-3 text-sm text-gray-500">{item.equipment}</td>
-                    <td className="p-3 text-sm text-gray-500">{item.location}</td>
-                    <td className="p-3 text-sm text-gray-500">{item.unit}</td>
-                    <td className="p-3 text-sm text-gray-500">{item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                     <td className="p-3 text-sm text-gray-500">
-                        <div className="flex items-center space-x-3">
-                            <button onClick={() => handleOpenEditModal(item)} title="Editar" className="hover:text-blue-600 transition-colors duration-200">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => setShowHistoryModal(item)} title="Ver Histórico" className="hover:text-green-600 transition-colors duration-200">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => setShowQrModal(item)} title="Gerar Etiqueta QR" className="hover:text-purple-600 transition-colors duration-200">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 15.375v4.5a1.125 1.125 0 001.125 1.125h4.5a1.125 1.125 0 001.125-1.125v-4.5A1.125 1.125 0 0019.125 14.25h-4.5A1.125 1.125 0 0013.5 15.375z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => setShowDeleteModal(item)} title="Excluir" className="hover:text-red-600 transition-colors duration-200">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </div>
+                        {editingItemId === item.id ? (
+                            <input type="text" name="description" value={editedItemData.description} onChange={handleEditChange} className="w-full p-1 border rounded" />
+                        ) : item.description}
+                    </td>
+                    <td className="p-3 text-sm text-gray-500">
+                         {editingItemId === item.id ? (
+                            <input type="text" name="location" value={editedItemData.location} onChange={handleEditChange} className="w-24 p-1 border rounded" />
+                        ) : item.location}
+                    </td>
+                    <td className="p-3 text-sm text-gray-500">
+                        {editingItemId === item.id ? (
+                            <input type="number" name="minStock" value={editedItemData.minStock} onChange={handleEditChange} className="w-20 p-1 border rounded" />
+                        ) : item.minStock}
+                    </td>
+                    <td className="p-3 text-sm text-gray-500">
+                        {editingItemId === item.id ? (
+                             <input type="number" step="0.01" name="value" value={editedItemData.value} onChange={handleEditChange} className="w-24 p-1 border rounded" />
+                        ) : item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td className="p-3 text-sm text-gray-500 text-center">
+                        {editingItemId === item.id ? (
+                            <div className="flex items-center justify-center space-x-2">
+                                <button onClick={handleSaveEdit} className="text-green-600 hover:text-green-800" title="Salvar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                </button>
+                                <button onClick={handleCancelEdit} className="text-red-600 hover:text-red-800" title="Cancelar">
+                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="relative inline-block text-left" data-menu-container="true">
+                                <button onClick={() => setActiveActionMenu(activeActionMenu === item.id ? null : item.id)} className="p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                                </button>
+                                {activeActionMenu === item.id && (
+                                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+                                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                            <button onClick={() => handleStartEdit(item)} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                                                Editar
+                                            </button>
+                                            <button onClick={() => {setShowHistoryModal(item); setActiveActionMenu(null);}} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                Histórico
+                                            </button>
+                                            <button onClick={() => {setShowQrModal(item); setActiveActionMenu(null);}} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 15.375v4.5a1.125 1.125 0 001.125 1.125h4.5a1.125 1.125 0 001.125-1.125v-4.5A1.125 1.125 0 0019.125 14.25h-4.5A1.125 1.125 0 0013.5 15.375z" /></svg>
+                                                Gerar Etiqueta
+                                            </button>
+                                            <div className="border-t my-1"></div>
+                                            <button onClick={() => {setShowDeleteModal(item); setActiveActionMenu(null);}} className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50" role="menuitem">
+                                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                Excluir
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </td>
                 </tr>
                 ))}
+                 {paginatedItems.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="text-center p-6 text-gray-500">
+                        {searchTerm ? 'Nenhum item encontrado para sua busca.' : 'Nenhum item cadastrado.'}
+                    </td>
+                  </tr>
+                )}
             </tbody>
             </table>
         </div>
@@ -748,61 +823,6 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
         </div>
       )}
 
-      {showEditModal && editedItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Editar Item: {showEditModal.code}</h3>
-                <form className="space-y-4">
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Descrição</label>
-                        <input type="text" name="description" value={editedItem.description} onChange={handleEditChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Equipamento</label>
-                        <input type="text" name="equipment" value={editedItem.equipment} onChange={handleEditChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Localização</label>
-                        <input type="text" name="location" value={editedItem.location} onChange={handleEditChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Unidade de Medida</label>
-                            <select name="unit" value={editedItem.unit} onChange={handleEditChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                <option>Unidade</option>
-                                <option>Quilograma</option>
-                                <option>Metro</option>
-                                <option>Par</option>
-                                <option>Bobina</option>
-                                <option>Caixa</option>
-                                <option>Peças</option>
-                                <option>Litro</option>
-                                <option>Pacote</option>
-                                <option>Rolo</option>
-                                <option>Saco</option>
-                                <option>Vara</option>
-                                <option>Lata</option>
-                                <option>Carretel</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Estoque Mínimo</label>
-                            <input type="number" name="minStock" value={editedItem.minStock} onChange={handleEditChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Valor Unitário</label>
-                            <input type="number" step="0.01" name="value" value={editedItem.value} onChange={handleEditChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                        </div>
-                    </div>
-                </form>
-                <div className="flex justify-end space-x-2 mt-6">
-                    <button onClick={() => setShowEditModal(null)} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                    <button onClick={handleConfirmEdit} className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700">Salvar Alterações</button>
-                </div>
-            </div>
-        </div>
-      )}
-
       {showQrModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
@@ -811,7 +831,7 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
                     <button onClick={() => setShowQrModal(null)} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
                 <div ref={qrModalContentRef} className="text-center p-4 border border-dashed border-gray-400 bg-white">
-                    <h4 className="font-extrabold text-2xl mb-1 tracking-wider">{showQrModal.code}</h4>
+                    <h4 className="font-extrabold text-4xl mb-2 tracking-wider">{showQrModal.code}</h4>
                     <p className="text-gray-600 mb-4 text-sm h-10">{showQrModal.description}</p>
                     <img 
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(showQrModal.code)}`}
@@ -840,7 +860,7 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
                         .filter(item => selectedItems.includes(item.id))
                         .map(item => (
                           <div key={item.id} className="text-center p-4 border border-dashed border-gray-400 bg-white">
-                              <h4 className="font-extrabold text-2xl mb-1 tracking-wider">{item.code}</h4>
+                              <h4 className="font-extrabold text-4xl mb-2 tracking-wider">{item.code}</h4>
                               <p className="text-gray-600 mb-4 text-sm h-10">{item.description}</p>
                               <img 
                                   src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(item.code)}`}
@@ -860,75 +880,71 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
         </div>
       )}
 
-      {showAddItemModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Adicionar Novo Item</h3>
-                <form onSubmit={handleConfirmAddItem} className="space-y-4">
-                    {addFormError && <p className="bg-red-100 text-red-700 p-3 rounded-md text-sm">{addFormError}</p>}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Código*</label>
-                            <input type="text" name="code" value={newItem.code || ''} onChange={handleAddItemChange} className={`mt-1 block w-full px-3 py-2 border ${codeError ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`} required />
-                            {codeError && <p className="text-red-500 text-xs mt-1">{codeError}</p>}
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
-                            <select name="supplier" value={newItem.supplier || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Descrição*</label>
-                        <input type="text" name="description" value={newItem.description || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Equipamento</label>
-                            <input type="text" name="equipment" value={newItem.equipment || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Localização*</label>
-                            <input type="text" name="location" value={newItem.location || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Unidade de Medida*</label>
-                            <select name="unit" value={newItem.unit || 'Unidade'} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                                <option>Unidade</option>
-                                <option>Quilograma</option>
-                                <option>Metro</option>
-                                <option>Par</option>
-                                <option>Bobina</option>
-                                <option>Caixa</option>
-                                <option>Peças</option>
-                                <option>Litro</option>
-                                <option>Pacote</option>
-                                <option>Rolo</option>
-                                <option>Saco</option>
-                                <option>Vara</option>
-                                <option>Lata</option>
-                                <option>Carretel</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Estoque Mínimo</label>
-                            <input type="number" name="minStock" value={newItem.minStock || 0} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Valor Unitário</label>
-                            <input type="number" step="0.01" name="value" value={newItem.value || 0} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-                        </div>
-                    </div>
-                    <div className="flex justify-end space-x-2 pt-4">
-                        <button type="button" onClick={() => { setShowAddItemModal(false); setAddFormError(''); setCodeError(''); setNewItem(initialNewItemState); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700">Adicionar Item</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+      {/* Add Item Slide-over Panel */}
+      {isAddItemPanelOpen && (
+          <div className="relative z-50" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+              <div className={`slide-over-overlay ${isAddItemPanelOpen ? 'opacity-100' : 'opacity-0'}`} onClick={closeAddItemPanel}></div>
+              <div className={`slide-over-panel ${isAddItemPanelOpen ? 'show' : ''}`}>
+                  <form onSubmit={handleConfirmAddItem} className="h-full flex flex-col">
+                      <div className="slide-over-header">
+                          <h2 id="slide-over-title" className="text-lg font-medium text-gray-900">Adicionar Novo Item</h2>
+                          <button onClick={closeAddItemPanel} type="button" className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                      </div>
+                      <div className="slide-over-body space-y-4">
+                           {addFormError && <p className="bg-red-100 text-red-700 p-3 rounded-md text-sm">{addFormError}</p>}
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Código*</label>
+                                  <input type="text" name="code" value={newItem.code || ''} onChange={handleAddItemChange} className={`mt-1 block w-full px-3 py-2 border ${codeError ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500`} required />
+                                  {codeError && <p className="text-red-500 text-xs mt-1">{codeError}</p>}
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
+                                  <select name="supplier" value={newItem.supplier || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                      {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                  </select>
+                              </div>
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Descrição*</label>
+                              <input type="text" name="description" value={newItem.description || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Equipamento</label>
+                                  <input type="text" name="equipment" value={newItem.equipment || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Localização*</label>
+                                  <input type="text" name="location" value={newItem.location || ''} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required />
+                              </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Unidade*</label>
+                                  <select name="unit" value={newItem.unit || 'Unidade'} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                                      <option>Unidade</option><option>Quilograma</option><option>Metro</option><option>Par</option><option>Bobina</option><option>Caixa</option><option>Peças</option><option>Litro</option><option>Pacote</option><option>Rolo</option><option>Saco</option><option>Vara</option><option>Lata</option><option>Carretel</option>
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Estoque Mínimo</label>
+                                  <input type="number" name="minStock" value={newItem.minStock || 0} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Valor Unitário</label>
+                                  <input type="number" step="0.01" name="value" value={newItem.value || 0} onChange={handleAddItemChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
+                              </div>
+                          </div>
+                      </div>
+                      <div className="slide-over-footer">
+                          <button type="button" onClick={closeAddItemPanel} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
+                          <button type="submit" className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700">Adicionar Item</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
       )}
 
       {showBulkImportModal && (
@@ -951,23 +967,31 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
                             <h4 className="font-semibold mb-2">Pré-visualização da Importação:</h4>
                             {importErrors.length > 0 && (
                                 <div className="bg-red-100 text-red-700 p-2 rounded-md mb-2">
-                                    <p className="font-bold">Erros encontrados:</p>
-                                    <ul className="list-disc list-inside text-sm">
-                                        {importErrors.map((error, i) => <li key={i}>{error}</li>)}
+                                    <p className="font-bold">Erros encontrados: {importErrors.length}</p>
+                                    <ul className="list-disc pl-5 text-sm">
+                                        {importErrors.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+                                        {importErrors.length > 5 && <li>...e mais {importErrors.length - 5} erros.</li>}
                                     </ul>
                                 </div>
                             )}
-                             {parsedCsvData.length > 0 && (
-                                <div className="bg-green-100 text-green-700 p-2 rounded-md">
-                                    <p className="font-bold">{parsedCsvData.length} item(ns) válido(s) pronto(s) para ser(em) importado(s).</p>
-                                </div>
+                            <p className="text-green-700 text-sm mb-2">{parsedCsvData.length} itens válidos prontos para importar.</p>
+                            {parsedCsvData.length > 0 && (
+                                <table className="w-full text-xs text-left">
+                                    <thead><tr className="bg-gray-50"><th className="p-1">Cód</th><th className="p-1">Descrição</th><th className="p-1">Valor</th></tr></thead>
+                                    <tbody>
+                                        {parsedCsvData.slice(0, 3).map((item, i) => (
+                                            <tr key={i} className="border-b"><td className="p-1">{item.code}</td><td className="p-1 truncate">{item.description}</td><td className="p-1">{item.value}</td></tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
+                             {parsedCsvData.length > 3 && <p className="text-xs text-gray-500 mt-1">...e mais {parsedCsvData.length - 3} itens.</p>}
                         </div>
                     )}
                 </div>
-                <div className="flex justify-end space-x-2 pt-6">
-                    <button type="button" onClick={() => { setShowBulkImportModal(false); setParsedCsvData([]); setImportErrors([]); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                    <button onClick={handleConfirmBulkImport} disabled={parsedCsvData.length === 0 || importErrors.length > 0} className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                <div className="flex justify-end space-x-2 mt-6">
+                    <button type="button" onClick={() => { setShowBulkImportModal(false); setParsedCsvData([]); setImportErrors([]); }} className="py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
+                    <button onClick={handleConfirmBulkImport} disabled={parsedCsvData.length === 0 || importErrors.length > 0} className="py-2 px-4 bg-blue-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                         Importar {parsedCsvData.length} Itens
                     </button>
                 </div>
@@ -977,5 +1001,3 @@ const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, setStockItems, su
     </div>
   );
 };
-
-export default EstoquePage;

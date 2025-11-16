@@ -3,11 +3,12 @@ import React from 'react';
 import { StockItem, User, Supplier, AuditLog, TopConsumedItem, CategoryDistribution, ItemHistory } from './types';
 
 export const AlumasaLogo = () => (
-    <div className="text-white">
-      <h1 className="text-lg font-bold leading-tight">Alumasa</h1>
-      <p className="text-xs font-light leading-tight">Controle do Almoxarifado</p>
+    <div className="flex flex-col">
+        <h1 className="text-xl font-bold leading-tight text-white">Alumasa</h1>
+        <p className="text-xs font-light leading-tight text-blue-300 mt-1">Controle do Almoxarifado</p>
     </div>
 );
+
 
 export const ICONS = {
     panel: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
@@ -23,7 +24,7 @@ export const ICONS = {
 };
 
 export const mockStockItems: StockItem[] = [
-    { id: '1', code: 'PAR-001', description: 'Parafuso Sextavado M8', equipment: 'Montagem Setor A', location: 'A1-01', unit: 'Unidade', systemStock: 1500, minStock: 500, value: 0.50, supplier: 'Parafusos e Cia' },
+    { id: '1', code: 'PAR-001', description: 'Parafuso Sextavado M8', equipment: 'Montagem Setor A', location: 'A1-01', unit: 'Unidade', systemStock: 1500, minStock: 500, value: 0.50, supplier: ['Parafusos e Cia', 'Global Suprimentos Industriais'] },
     { id: '2', code: 'CHP-010', description: 'Chapa de Aço 1/4"', equipment: 'Corte e Dobra', location: 'B2-05', unit: 'Quilograma', systemStock: 450, minStock: 200, value: 5.50, supplier: 'Aço Forte' },
     { id: '3', code: 'TUB-304', description: 'Tubo Inox 2"', equipment: 'Serralheria', location: 'B2-06', unit: 'Metro', systemStock: 120, minStock: 50, value: 45.00, supplier: 'Aço Forte' },
     { id: '4', code: 'EPI-002', description: 'Amor de', equipment: 'Segurança do Trabalho', location: 'C3-12', unit: 'Par', systemStock: 80, minStock: 100, value: 12.00, supplier: 'Global Suprimentos Industriais' },

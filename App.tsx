@@ -6,7 +6,8 @@ import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Painel from './components/Dashboard';
-import EstoquePage, { InventoryPage } from './components/ItemListPage';
+// FIX: Changed import to use named exports for both components from ItemListPage.
+import { EstoquePage, InventoryPage } from './components/ItemListPage';
 import RelatoriosPage from './components/PlaceholderPage';
 import AuditPage from './components/AuditPage';
 import { mockUsers, mockSuppliers, mockStockItems, mockAuditLogs, mockHistoryData } from './constants';
@@ -30,10 +31,12 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
     const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
     const [quantity, setQuantity] = useState('');
     const [selectedSupplier, setSelectedSupplier] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (selectedItem) {
-            setSelectedSupplier(selectedItem.supplier || '');
+            const firstSupplier = Array.isArray(selectedItem.supplier) ? selectedItem.supplier[0] : selectedItem.supplier;
+            setSelectedSupplier(firstSupplier || '');
         } else {
             setSelectedSupplier('');
         }
@@ -61,40 +64,57 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
 
     const handleRegisterExitSubmit = (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      setIsSubmitting(true);
       const formData = new FormData(e.currentTarget);
       if (selectedItem && quantity) {
-          onRegisterExit({
-              itemId: selectedItem.id,
-              quantity: parseInt(quantity, 10),
-              requester: formData.get('requester') as string,
-              responsible: formData.get('responsible') as string,
-          });
-          showToast('Saída registrada com sucesso!');
-          resetForm();
-          e.currentTarget.reset();
+          setTimeout(() => { // Simulate API call
+            onRegisterExit({
+                itemId: selectedItem.id,
+                quantity: parseInt(quantity, 10),
+                requester: formData.get('requester') as string,
+                responsible: formData.get('responsible') as string,
+            });
+            showToast('Saída registrada com sucesso!');
+            resetForm();
+            e.currentTarget.reset();
+            setIsSubmitting(false);
+          }, 1000);
       } else {
         alert('Por favor, selecione um item e informe a quantidade.');
+        setIsSubmitting(false);
       }
     };
     
     const handleRegisterEntrySubmit = (e: React.FormEvent<HTMLFormElement>) => {
        e.preventDefault();
+       setIsSubmitting(true);
        const formData = new FormData(e.currentTarget);
        if(selectedItem && quantity) {
-         onRegisterEntry({
-           itemId: selectedItem.id,
-           quantity: parseInt(quantity, 10),
-           supplier: selectedSupplier,
-           nf: formData.get('nf') as string,
-           observations: formData.get('observations') as string,
-         });
-         showToast('Entrada registrada com sucesso!');
-         resetForm();
-         e.currentTarget.reset();
+         setTimeout(() => { // Simulate API call
+           onRegisterEntry({
+             itemId: selectedItem.id,
+             quantity: parseInt(quantity, 10),
+             supplier: selectedSupplier,
+             nf: formData.get('nf') as string,
+             observations: formData.get('observations') as string,
+           });
+           showToast('Entrada registrada com sucesso!');
+           resetForm();
+           e.currentTarget.reset();
+           setIsSubmitting(false);
+         }, 1000);
        } else {
          alert('Por favor, selecione o item e a quantidade.');
+         setIsSubmitting(false);
        }
     };
+    
+    const SpinnerIcon = () => (
+        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    );
 
 
     const renderForm = () => {
@@ -132,6 +152,9 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
                                     ))}
                                 </ul>
                             )}
+                            {selectedItem && (
+                               <p className="text-sm text-blue-600 mt-2">Estoque atual: <span className="font-bold">{selectedItem.systemStock}</span> {selectedItem.unit}(s)</p>
+                            )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -148,8 +171,8 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
                             <input type="text" name="responsible" placeholder="Insira o nome do responsável" className="w-full p-2 border border-gray-300 rounded-md" required />
                         </div>
                         <div className="flex justify-end pt-4">
-                            <button type="submit" className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-md transition duration-300" disabled={!selectedItem}>
-                                Registrar
+                            <button type="submit" className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-md transition duration-300 flex items-center justify-center min-w-[120px]" disabled={!selectedItem || isSubmitting}>
+                                {isSubmitting ? <><SpinnerIcon /> Processando...</> : 'Registrar'}
                             </button>
                         </div>
                     </form>
@@ -191,6 +214,9 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
                                     ))}
                                 </ul>
                             )}
+                             {selectedItem && (
+                               <p className="text-sm text-blue-600 mt-2">Estoque atual: <span className="font-bold">{selectedItem.systemStock}</span> {selectedItem.unit}(s)</p>
+                            )}
                       </div>
                       <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade*</label>
@@ -221,8 +247,8 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
                         <textarea name="observations" rows={3} placeholder="Detalhes adicionais sobre a entrada." className="w-full p-2 border border-gray-300 rounded-md"></textarea>
                     </div>
                     <div className="flex justify-end pt-4">
-                         <button type="submit" className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-md transition duration-300" disabled={!selectedItem}>
-                            Registrar Entrada
+                         <button type="submit" className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-md transition duration-300 flex items-center justify-center min-w-[150px]" disabled={!selectedItem || isSubmitting}>
+                            {isSubmitting ? <><SpinnerIcon /> Processando...</> : 'Registrar Entrada'}
                         </button>
                     </div>
                 </form>
@@ -255,6 +281,14 @@ interface ControlePageProps {
     onRestoreBackup: (data: any) => void;
     showToast: (message: string) => void;
 }
+
+type PanelMode = 'addUser' | 'editUser' | 'changePassword' | 'addSupplier' | 'editSupplier' | '';
+interface PanelState {
+    isOpen: boolean;
+    mode: PanelMode;
+    data: User | Supplier | null;
+}
+
 const ControlePage: React.FC<ControlePageProps> = ({ 
     users, suppliers, allData,
     onAddUser, onUpdateUser, onDeleteUser,
@@ -264,37 +298,49 @@ const ControlePage: React.FC<ControlePageProps> = ({
 }) => {
     const { tab = 'usuarios' } = useParams<{ tab: string }>();
     
-    // Modals state - Users
+    // Deletion modals state
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
-    const [userToEdit, setUserToEdit] = useState<User | null>(null);
-    const [userToChangePassword, setUserToChangePassword] = useState<User | null>(null);
-    const [showAddUserModal, setShowAddUserModal] = useState(false);
-     // Modals state - Suppliers
     const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
-    const [supplierToEdit, setSupplierToEdit] = useState<Supplier | null>(null);
-    const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
     
-    // Form states - Users
-    const [newUser, setNewUser] = useState<Omit<User, 'id' | 'avatarUrl'>>({ name: '', email: '', profile: 'Operador' });
-    const [addUserError, setAddUserError] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [passwordError, setPasswordError] = useState('');
-    // Form states - Suppliers
-    const [newSupplier, setNewSupplier] = useState<Omit<Supplier, 'id'>>({ name: '', contact: '', email: '', phone: '' });
+    // Slide-over panel state
+    const [panelState, setPanelState] = useState<PanelState>({ isOpen: false, mode: '', data: null });
+    
+    // Form states
+    const [formData, setFormData] = useState<any>({});
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
     const restoreInputRef = useRef<HTMLInputElement>(null);
-    
-    // Mock logged-in user for permission check. Let's assume the admin is logged in.
     const loggedInUser: User | undefined = users.find(u => u.profile === 'Administrador');
 
-    const handleOpenEditUserModal = (user: User) => setUserToEdit({ ...user });
-    const handleSaveUserChanges = () => {
-        if (userToEdit) {
-            onUpdateUser(userToEdit);
-            setUserToEdit(null);
+    const openPanel = (mode: PanelMode, data: User | Supplier | null = null) => {
+        setPanelState({ isOpen: true, mode, data });
+        setFormData(data || {});
+        setFormErrors({});
+    };
+    const closePanel = () => {
+        setPanelState({ isOpen: false, mode: '', data: null });
+        setFormData({});
+        setFormErrors({});
+    };
+
+    // User Handlers
+    const handleSaveUser = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (panelState.mode === 'addUser') {
+            const success = onAddUser(formData);
+            if(success) {
+                showToast('Usuário adicionado com sucesso!');
+                closePanel();
+            } else {
+                setFormErrors({ email: 'Este e-mail já está em uso.' });
+            }
+        } else if (panelState.mode === 'editUser') {
+            onUpdateUser(formData as User);
             showToast('Usuário atualizado com sucesso!');
+            closePanel();
         }
     };
+    
     const handleConfirmDeleteUser = () => {
         if (userToDelete) {
             onDeleteUser(userToDelete.id);
@@ -302,64 +348,42 @@ const ControlePage: React.FC<ControlePageProps> = ({
             showToast('Usuário excluído com sucesso!');
         }
     };
-    const handleAddNewUser = (e: React.FormEvent) => {
-        e.preventDefault();
-        const success = onAddUser(newUser);
-        if (success) {
-            setShowAddUserModal(false);
-            setNewUser({ name: '', email: '', profile: 'Operador' });
-            setAddUserError('');
-            showToast('Usuário adicionado com sucesso!');
-        } else {
-            setAddUserError('Este e-mail já está em uso.');
-        }
-    };
+
     const handleChangePassword = (e: React.FormEvent) => {
         e.preventDefault();
+        const { newPassword, confirmPassword } = formData;
         if (newPassword !== confirmPassword) {
-            setPasswordError('As senhas não coincidem.');
+            setFormErrors({ password: 'As senhas não coincidem.' });
             return;
         }
         if (newPassword.length < 6) {
-            setPasswordError('A senha deve ter pelo menos 6 caracteres.');
+            setFormErrors({ password: 'A senha deve ter pelo menos 6 caracteres.' });
             return;
         }
-        showToast(`Senha do usuário ${userToChangePassword?.name} alterada com sucesso!`);
-        setUserToChangePassword(null);
-        setNewPassword('');
-        setConfirmPassword('');
-        setPasswordError('');
-    };
-    const handleOpenChangePasswordModal = (user: User) => {
-        if (loggedInUser?.profile !== 'Administrador') {
-            alert('Apenas administradores podem alterar senhas.');
-            return;
-        }
-        setUserToChangePassword(user);
+        showToast(`Senha do usuário ${panelState.data?.name} alterada com sucesso!`);
+        closePanel();
     };
 
     // Supplier Handlers
-    const handleOpenEditSupplierModal = (supplier: Supplier) => setSupplierToEdit({ ...supplier });
-    const handleSaveSupplierChanges = () => {
-        if (supplierToEdit) {
-            onUpdateSupplier(supplierToEdit);
-            setSupplierToEdit(null);
+     const handleSaveSupplier = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (panelState.mode === 'addSupplier') {
+            onAddSupplier(formData);
+            showToast('Fornecedor adicionado com sucesso!');
+            closePanel();
+        } else if (panelState.mode === 'editSupplier') {
+            onUpdateSupplier(formData as Supplier);
             showToast('Fornecedor atualizado com sucesso!');
+            closePanel();
         }
     };
+
     const handleConfirmDeleteSupplier = () => {
         if (supplierToDelete) {
             onDeleteSupplier(supplierToDelete.id);
             setSupplierToDelete(null);
             showToast('Fornecedor excluído com sucesso!');
         }
-    };
-    const handleAddNewSupplier = (e: React.FormEvent) => {
-        e.preventDefault();
-        onAddSupplier(newSupplier);
-        setShowAddSupplierModal(false);
-        setNewSupplier({ name: '', contact: '', email: '', phone: '' });
-        showToast('Fornecedor adicionado com sucesso!');
     };
 
     // Backup handlers
@@ -400,17 +424,98 @@ const ControlePage: React.FC<ControlePageProps> = ({
             event.target.value = '';
         }
     };
+    
+    const renderPanelContent = () => {
+        switch (panelState.mode) {
+            case 'addUser':
+            case 'editUser':
+                return (
+                    <form id="user-form" onSubmit={handleSaveUser}>
+                        {formErrors.email && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{formErrors.email}</p>}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Nome</label>
+                                <input type="text" value={formData.name || ''} onChange={(e) => setFormData({...formData, name: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">E-mail</label>
+                                <input type="email" value={formData.email || ''} onChange={(e) => setFormData({...formData, email: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Perfil</label>
+                                <select value={formData.profile || 'Operador'} onChange={(e) => setFormData({...formData, profile: e.target.value as 'Administrador' | 'Operador'})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
+                                    <option value="Operador">Operador</option>
+                                    <option value="Administrador">Administrador</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                );
+            case 'changePassword':
+                return (
+                     <form id="password-form" onSubmit={handleChangePassword}>
+                        {formErrors.password && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{formErrors.password}</p>}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Nova Senha</label>
+                                <input type="password" value={formData.newPassword || ''} onChange={(e) => setFormData({...formData, newPassword: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Confirmar Senha</label>
+                                <input type="password" value={formData.confirmPassword || ''} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
+                            </div>
+                        </div>
+                    </form>
+                );
+            case 'addSupplier':
+            case 'editSupplier':
+                return (
+                     <form id="supplier-form" onSubmit={handleSaveSupplier} className="space-y-4">
+                        <input type="text" placeholder="Nome" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border rounded-md" required />
+                        <input type="text" placeholder="Contato" value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+                        <input type="email" placeholder="E-mail" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+                        <input type="text" placeholder="Telefone" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+                    </form>
+                );
+            default:
+                return null;
+        }
+    };
+    
+    const getPanelTitle = () => {
+        switch(panelState.mode) {
+            case 'addUser': return 'Adicionar Novo Usuário';
+            case 'editUser': return 'Editar Usuário';
+            case 'changePassword': return `Alterar Senha de ${panelState.data?.name}`;
+            case 'addSupplier': return 'Adicionar Novo Fornecedor';
+            case 'editSupplier': return 'Editar Fornecedor';
+            default: return '';
+        }
+    }
+    
+    const getPanelFormId = () => {
+        switch(panelState.mode) {
+            case 'addUser':
+            case 'editUser':
+                return 'user-form';
+            case 'changePassword':
+                return 'password-form';
+            case 'addSupplier':
+            case 'editSupplier':
+                return 'supplier-form';
+            default: return '';
+        }
+    }
 
 
     const renderContent = () => {
         switch (tab) {
             case 'usuarios':
                 return (
-                  <>
                     <div className="bg-white p-6 rounded-lg shadow-md">
                       <div className="flex justify-between items-center mb-4">
                           <h2 className="text-xl font-semibold text-gray-800">Gerenciamento de Usuários</h2>
-                          <button onClick={() => setShowAddUserModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">+ Novo usuário</button>
+                          <button onClick={() => openPanel('addUser')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">+ Novo usuário</button>
                       </div>
                       <table className="w-full text-left">
                           <thead>
@@ -430,12 +535,12 @@ const ControlePage: React.FC<ControlePageProps> = ({
                                       <td className="p-3 text-sm text-gray-500">{user.email}</td>
                                       <td className="p-3"><span className={`px-2 py-1 text-xs rounded-full ${user.profile === 'Administrador' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{user.profile}</span></td>
                                       <td className="p-3 text-gray-500 flex items-center space-x-3">
-                                          <button onClick={() => handleOpenEditUserModal(user)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
+                                          <button onClick={() => openPanel('editUser', user)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
                                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
                                               </svg>
                                           </button>
-                                          <button onClick={() => handleOpenChangePasswordModal(user)} className="hover:text-yellow-600 transition-colors duration-200" title="Alterar Senha">
+                                          <button onClick={() => { if (loggedInUser?.profile === 'Administrador') openPanel('changePassword', user) }} className="hover:text-yellow-600 transition-colors duration-200" title="Alterar Senha">
                                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                               </svg>
@@ -451,118 +556,13 @@ const ControlePage: React.FC<ControlePageProps> = ({
                           </tbody>
                       </table>
                     </div>
-                    
-                    {/* Add User Modal */}
-                    {showAddUserModal && (
-                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">Adicionar Novo Usuário</h3>
-                                <form onSubmit={handleAddNewUser}>
-                                    {addUserError && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{addUserError}</p>}
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Nome</label>
-                                            <input type="text" value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">E-mail</label>
-                                            <input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Perfil</label>
-                                            <select value={newUser.profile} onChange={(e) => setNewUser({...newUser, profile: e.target.value as 'Administrador' | 'Operador'})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
-                                                <option value="Operador">Operador</option>
-                                                <option value="Administrador">Administrador</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end space-x-2 mt-6">
-                                        <button type="button" onClick={() => setShowAddUserModal(false)} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                                        <button type="submit" className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700">Adicionar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Edit User Modal */}
-                    {userToEdit && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">Editar Usuário</h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Nome</label>
-                                        <input type="text" value={userToEdit.name} onChange={(e) => setUserToEdit({...userToEdit, name: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"/>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">E-mail</label>
-                                        <input type="email" value={userToEdit.email} onChange={(e) => setUserToEdit({...userToEdit, email: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"/>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Perfil</label>
-                                        <select value={userToEdit.profile} onChange={(e) => setUserToEdit({...userToEdit, profile: e.target.value as 'Administrador' | 'Operador'})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
-                                            <option>Administrador</option>
-                                            <option>Operador</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="flex justify-end space-x-2 mt-6">
-                                    <button onClick={() => setUserToEdit(null)} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                                    <button onClick={handleSaveUserChanges} className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700">Salvar</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Delete User Modal */}
-                    {userToDelete && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
-                                <h3 className="text-lg font-bold text-gray-800">Confirmar Exclusão</h3>
-                                <p className="text-gray-600 my-4">Tem certeza que deseja excluir o usuário <span className="font-semibold">{userToDelete.name}</span>? Esta ação não pode ser desfeita.</p>
-                                <div className="flex justify-end space-x-2">
-                                    <button onClick={() => setUserToDelete(null)} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                                    <button onClick={handleConfirmDeleteUser} className="py-2 px-4 bg-red-600 text-white rounded-md hover:bg-red-700">Excluir</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Change Password Modal */}
-                     {userToChangePassword && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">Alterar Senha para {userToChangePassword.name}</h3>
-                                <form onSubmit={handleChangePassword}>
-                                    {passwordError && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{passwordError}</p>}
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Nova Senha</label>
-                                            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Confirmar Senha</label>
-                                            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required/>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end space-x-2 mt-6">
-                                        <button type="button" onClick={() => setUserToChangePassword(null)} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                                        <button type="submit" className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700">Alterar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                  </>
                 );
             case 'fornecedores':
                  return (
-                  <>
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold text-gray-800">Gerenciamento de Fornecedores</h2>
-                            <button onClick={() => setShowAddSupplierModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">+ Novo</button>
+                            <button onClick={() => openPanel('addSupplier')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">+ Novo</button>
                         </div>
                         <table className="w-full text-left">
                             <thead>
@@ -582,7 +582,7 @@ const ControlePage: React.FC<ControlePageProps> = ({
                                         <td className="p-3 text-sm text-gray-500">{sup.email}</td>
                                         <td className="p-3 text-sm text-gray-500">{sup.phone}</td>
                                         <td className="p-3 text-gray-500 flex items-center space-x-3">
-                                            <button onClick={() => handleOpenEditSupplierModal(sup)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
+                                            <button onClick={() => openPanel('editSupplier', sup)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
                                                 </svg>
@@ -598,59 +598,6 @@ const ControlePage: React.FC<ControlePageProps> = ({
                             </tbody>
                         </table>
                     </div>
-
-                    {/* Add Supplier Modal */}
-                    {showAddSupplierModal && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">Adicionar Novo Fornecedor</h3>
-                                <form onSubmit={handleAddNewSupplier} className="space-y-4">
-                                    <input type="text" placeholder="Nome" value={newSupplier.name} onChange={e => setNewSupplier({...newSupplier, name: e.target.value})} className="w-full px-3 py-2 border rounded-md" required />
-                                    <input type="text" placeholder="Contato" value={newSupplier.contact} onChange={e => setNewSupplier({...newSupplier, contact: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-                                    <input type="email" placeholder="E-mail" value={newSupplier.email} onChange={e => setNewSupplier({...newSupplier, email: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-                                    <input type="text" placeholder="Telefone" value={newSupplier.phone} onChange={e => setNewSupplier({...newSupplier, phone: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-                                    <div className="flex justify-end space-x-2 mt-4">
-                                        <button type="button" onClick={() => setShowAddSupplierModal(false)} className="py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
-                                        <button type="submit" className="py-2 px-4 bg-blue-600 text-white rounded-md">Adicionar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Edit Supplier Modal */}
-                    {supplierToEdit && (
-                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">Editar Fornecedor</h3>
-                                <form onSubmit={(e) => { e.preventDefault(); handleSaveSupplierChanges(); }} className="space-y-4">
-                                    <input type="text" placeholder="Nome" value={supplierToEdit.name} onChange={e => setSupplierToEdit({...supplierToEdit, name: e.target.value})} className="w-full px-3 py-2 border rounded-md" required />
-                                    <input type="text" placeholder="Contato" value={supplierToEdit.contact} onChange={e => setSupplierToEdit({...supplierToEdit, contact: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-                                    <input type="email" placeholder="E-mail" value={supplierToEdit.email} onChange={e => setSupplierToEdit({...supplierToEdit, email: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-                                    <input type="text" placeholder="Telefone" value={supplierToEdit.phone} onChange={e => setSupplierToEdit({...supplierToEdit, phone: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-                                    <div className="flex justify-end space-x-2 mt-4">
-                                        <button type="button" onClick={() => setSupplierToEdit(null)} className="py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
-                                        <button type="submit" className="py-2 px-4 bg-blue-600 text-white rounded-md">Salvar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Delete Supplier Modal */}
-                    {supplierToDelete && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
-                                <h3 className="text-lg font-bold text-gray-800">Confirmar Exclusão</h3>
-                                <p className="text-gray-600 my-4">Tem certeza que deseja excluir o fornecedor <span className="font-semibold">{supplierToDelete.name}</span>?</p>
-                                <div className="flex justify-end space-x-2">
-                                    <button onClick={() => setSupplierToDelete(null)} className="py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
-                                    <button onClick={handleConfirmDeleteSupplier} className="py-2 px-4 bg-red-600 text-white rounded-md">Excluir</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                  </>
                 );
             case 'backup':
                  return (
@@ -686,6 +633,59 @@ const ControlePage: React.FC<ControlePageProps> = ({
         <div>
             <h1 className="text-2xl font-semibold text-gray-800 mb-6 capitalize">{tab.replace('-', ' & ')}</h1>
             {renderContent()}
+
+            {/* Slide-over Panel */}
+            {panelState.isOpen && (
+                <div className="relative z-50" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+                    <div className={`slide-over-overlay ${panelState.isOpen ? 'opacity-100' : 'opacity-0'}`} onClick={closePanel}></div>
+                    <div className={`slide-over-panel ${panelState.isOpen ? 'show' : ''}`}>
+                        <div className="slide-over-header">
+                            <h2 id="slide-over-title" className="text-lg font-medium text-gray-900">{getPanelTitle()}</h2>
+                            <button onClick={closePanel} type="button" className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <span className="sr-only">Close panel</span>
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="slide-over-body">
+                           {renderPanelContent()}
+                        </div>
+                        <div className="slide-over-footer">
+                            <button onClick={closePanel} type="button" className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Cancelar</button>
+                            <button form={getPanelFormId()} type="submit" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Salvar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Delete User Modal */}
+            {userToDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+                        <h3 className="text-lg font-bold text-gray-800">Confirmar Exclusão</h3>
+                        <p className="text-gray-600 my-4">Tem certeza que deseja excluir o usuário <span className="font-semibold">{userToDelete.name}</span>? Esta ação não pode ser desfeita.</p>
+                        <div className="flex justify-end space-x-2">
+                            <button onClick={() => setUserToDelete(null)} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
+                            <button onClick={handleConfirmDeleteUser} className="py-2 px-4 bg-red-600 text-white rounded-md hover:bg-red-700">Excluir</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+             {/* Delete Supplier Modal */}
+            {supplierToDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+                        <h3 className="text-lg font-bold text-gray-800">Confirmar Exclusão</h3>
+                        <p className="text-gray-600 my-4">Tem certeza que deseja excluir o fornecedor <span className="font-semibold">{supplierToDelete.name}</span>?</p>
+                        <div className="flex justify-end space-x-2">
+                            <button onClick={() => setSupplierToDelete(null)} className="py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
+                            <button onClick={handleConfirmDeleteSupplier} className="py-2 px-4 bg-red-600 text-white rounded-md">Excluir</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -700,7 +700,6 @@ const App: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(mockAuditLogs);
   const [historyData, setHistoryData] = useState<Record<string, ItemHistory[]>>(mockHistoryData);
-  const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const toastTimeoutRef = useRef<number | null>(null);
 
@@ -853,12 +852,12 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-100 font-sans">
       <Sidebar onLogout={handleLogout} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header user={loggedInUser} stockItems={stockItems} searchTerm={searchTerm} setSearchTerm={setSearchTerm}/>
+        <Header user={loggedInUser} stockItems={stockItems} />
         <main className="flex-1 flex overflow-hidden">
           <Routes>
             <Route path="/" element={<Navigate to="/painel" replace />} />
-            <Route path="/painel" element={<PageWrapper><Painel stockItems={stockItems}/></PageWrapper>} />
-            <Route path="/estoque/atual" element={<PageWrapper><EstoquePage stockItems={stockItems} setStockItems={setStockItems} suppliers={suppliers} searchTerm={searchTerm} addAuditLog={addAuditLog} showToast={showToast} historyData={historyData} /></PageWrapper>} />
+            <Route path="/painel" element={<PageWrapper><Painel stockItems={stockItems} historyData={historyData} /></PageWrapper>} />
+            <Route path="/estoque/atual" element={<PageWrapper><EstoquePage stockItems={stockItems} setStockItems={setStockItems} suppliers={suppliers} addAuditLog={addAuditLog} showToast={showToast} historyData={historyData} /></PageWrapper>} />
             <Route path="/estoque/inventario" element={<PageWrapper><InventoryPage stockItems={stockItems} setStockItems={setStockItems} addAuditLog={addAuditLog} showToast={showToast} /></PageWrapper>} />
             <Route path="/movimentacoes/:tab" element={<PageWrapper><MovimentacoesPage stockItems={stockItems} suppliers={suppliers} onRegisterEntry={handleRegisterEntry} onRegisterExit={handleRegisterExit} showToast={showToast} /></PageWrapper>} />
             <Route path="/controle/:tab" element={<PageWrapper><ControlePage 

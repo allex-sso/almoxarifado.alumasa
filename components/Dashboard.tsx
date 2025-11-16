@@ -1,8 +1,9 @@
 
-import React from 'react';
+
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { mockTopConsumed, mockCategoryDistribution } from '../constants';
-import { TopConsumedItem, CategoryDistribution, StockItem } from '../types';
+import { TopConsumedItem, CategoryDistribution, StockItem, ItemHistory } from '../types';
 
 interface DashboardCardProps {
   title: React.ReactNode;
@@ -25,10 +26,67 @@ const DashboardCard: React.FC<DashboardCardProps> = ({ title, value, icon, bgCol
 
 interface PainelProps {
     stockItems: StockItem[];
+    historyData: Record<string, ItemHistory[]>;
 }
 
-const Painel: React.FC<PainelProps> = ({ stockItems }) => {
-  const maxBarValue = Math.max(...mockTopConsumed.map(item => item.value));
+const Painel: React.FC<PainelProps> = ({ stockItems, historyData }) => {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const parseDate = (dateString: string) => {
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) return null;
+    const [day, month, year] = dateString.split('/').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const filteredData = useMemo(() => {
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    if (start) start.setHours(0, 0, 0, 0);
+    if (end) end.setHours(23, 59, 59, 999);
+
+    let totalEntradas = 0;
+    let totalSaidas = 0;
+    const consumptionMap = new Map<string, number>();
+
+    for (const itemId in historyData) {
+      const itemHistories = historyData[itemId];
+      const item = stockItems.find(i => i.id === itemId);
+      if (!item) continue;
+
+      for (const history of itemHistories) {
+        const historyDate = parseDate(history.date);
+        if (!historyDate) continue;
+
+        const isAfterStart = start ? historyDate >= start : true;
+        const isBeforeEnd = end ? historyDate <= end : true;
+
+        if (isAfterStart && isBeforeEnd) {
+          if (history.type === 'Entrada') {
+            totalEntradas += history.quantity;
+          } else if (history.type === 'Saída') {
+            totalSaidas += history.quantity;
+            const consumedValue = (consumptionMap.get(item.description) || 0) + (history.quantity * item.value);
+            consumptionMap.set(item.description, consumedValue);
+          }
+        }
+      }
+    }
+
+    const topConsumed = Array.from(consumptionMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 7);
+      
+    const finalTopConsumed = topConsumed.length > 0 ? topConsumed : [];
+
+    return { totalEntradas, totalSaidas, topConsumed: finalTopConsumed };
+  }, [stockItems, historyData, startDate, endDate]);
+
+  const { totalEntradas, totalSaidas, topConsumed } = filteredData;
+  const displayTopConsumed = topConsumed.length > 0 ? topConsumed : mockTopConsumed;
+
+  const maxBarValue = Math.max(...displayTopConsumed.map(item => item.value), 1);
   const itemsAbaixoMinimo = stockItems.filter(i => i.systemStock <= i.minStock).length;
   const totalValue = stockItems.reduce((acc, item) => acc + (item.systemStock * item.value), 0);
 
@@ -42,7 +100,34 @@ const Painel: React.FC<PainelProps> = ({ stockItems }) => {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-800 mb-6">Painel</h1>
+       <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold text-gray-800">Painel</h1>
+        <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm border">
+            <label htmlFor="start-date" className="text-sm font-medium text-gray-700">Período:</label>
+            <input 
+                type="date" 
+                id="start-date"
+                value={startDate} 
+                onChange={e => setStartDate(e.target.value)} 
+                className="p-1 border border-gray-300 rounded-md text-sm"
+            />
+            <span className="text-gray-500">-</span>
+            <input 
+                type="date" 
+                id="end-date"
+                value={endDate} 
+                onChange={e => setEndDate(e.target.value)} 
+                className="p-1 border border-gray-300 rounded-md text-sm"
+            />
+            <button 
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="text-sm text-blue-600 hover:underline px-2"
+                title="Limpar filtros"
+            >
+                Limpar
+            </button>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
         <Link to="/estoque/atual" className="transform hover:-translate-y-1 transition-transform duration-200">
@@ -79,7 +164,7 @@ const Painel: React.FC<PainelProps> = ({ stockItems }) => {
             bgColor="bg-emerald-500"
             icon={icons.entradas}
             title={<>Entradas no<br/>Período</>}
-            value="620"
+            value={totalEntradas.toLocaleString('pt-BR')}
           />
         </Link>
         <Link to="/movimentacoes/nova-saida" className="transform hover:-translate-y-1 transition-transform duration-200">
@@ -87,7 +172,7 @@ const Painel: React.FC<PainelProps> = ({ stockItems }) => {
             bgColor="bg-orange-600"
             icon={icons.saidas}
             title={<>Saídas no<br/>Período</>}
-            value="50"
+            value={totalSaidas.toLocaleString('pt-BR')}
           />
         </Link>
       </div>
@@ -96,7 +181,7 @@ const Painel: React.FC<PainelProps> = ({ stockItems }) => {
         <div className="bg-white p-6 rounded-lg shadow-md xl:col-span-3">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Top 7 Itens Consumidos (Valor)</h2>
           <div className="space-y-4">
-            {mockTopConsumed.map((item: TopConsumedItem) => (
+            {displayTopConsumed.map((item: TopConsumedItem) => (
               <div key={item.name} className="relative group">
                 <div className="flex items-center">
                     <p className="w-24 text-sm text-gray-600 shrink-0">{item.name}</p>
@@ -105,7 +190,7 @@ const Painel: React.FC<PainelProps> = ({ stockItems }) => {
                         className="bg-blue-500 h-5 rounded-full flex items-center justify-end pr-2 text-white text-xs"
                         style={{ width: `${(item.value / maxBarValue) * 100}%` }}
                       >
-                        {item.value.toLocaleString('pt-BR')}
+                        {item.value > 0 ? item.value.toLocaleString('pt-BR') : ''}
                       </div>
                     </div>
                 </div>
@@ -114,6 +199,11 @@ const Painel: React.FC<PainelProps> = ({ stockItems }) => {
                 </div>
               </div>
             ))}
+             {displayTopConsumed.length === 0 && (
+                <div className="text-center text-gray-500 py-8">
+                    Nenhum dado de consumo para o período selecionado.
+                </div>
+            )}
           </div>
         </div>
         

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useMemo } from 'react';
 import { StockItem, ItemHistory } from '../types';
 
@@ -9,10 +8,72 @@ interface RelatoriosPageProps {
   historyData: Record<string, ItemHistory[]>;
 }
 
+const printContent = (content: HTMLDivElement | null, title: string) => {
+    if (content) {
+        const printWindow = window.open('', '', 'height=800,width=1000');
+        if (printWindow) {
+            printWindow.document.write(`<html><head><title>${title}</title>`);
+            printWindow.document.write('<script src="https://cdn.tailwindcss.com"></script>');
+            printWindow.document.write(`
+                <style>
+                    body { 
+                        -webkit-print-color-adjust: exact; 
+                        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
+                    @media print {
+                        body {
+                            margin: 1rem;
+                        }
+                        button, .no-print {
+                            display: none !important;
+                        }
+                        .border {
+                           border: none !important;
+                        }
+                        .rounded-md {
+                           border-radius: 0 !important;
+                        }
+                        .p-4 {
+                           padding: 0 !important;
+                        }
+                    }
+                </style>
+            `);
+            printWindow.document.write('</head><body class="p-4">');
+            const contentToPrint = content.cloneNode(true) as HTMLElement;
+            contentToPrint.querySelectorAll('.no-print').forEach(el => el.remove());
+            printWindow.document.write(contentToPrint.innerHTML);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => { 
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+    }
+};
+
 const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems }) => {
-  const itemsAbaixoMinimo = stockItems.filter(i => i.systemStock <= i.minStock);
+  const [filterText, setFilterText] = useState('');
+  const itemsAbaixoMinimo = useMemo(() => {
+    let items = stockItems.filter(i => i.systemStock <= i.minStock);
+    if (filterText) {
+        items = items.filter(i => 
+            i.code.toLowerCase().includes(filterText.toLowerCase()) ||
+            i.description.toLowerCase().includes(filterText.toLowerCase())
+        );
+    }
+    return items;
+  }, [stockItems, filterText]);
+  
   const [pedidoItems, setPedidoItems] = useState<Record<string, string>>({});
+  const [showPedidoModal, setShowPedidoModal] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const reportPrintRef = useRef<HTMLDivElement>(null);
 
   const handlePedidoChange = (code: string, quantity: string) => {
     setPedidoItems(prev => ({ ...prev, [code]: quantity }));
@@ -23,24 +84,11 @@ const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems 
     return description && description.trim() !== '';
   });
   
-  const handleExportCsv = () => {
-    const headers = ["CÓDIGO", "DESCRIÇÃO", "ESTOQUE ATUAL", "ESTOQUE MÍNIMO", "FORNECEDOR"];
-    const csvRows = [
-        headers.join(';'),
-        ...itemsAbaixoMinimo.map(item => [
-            item.code,
-            `"${item.description}"`,
-            item.systemStock,
-            item.minStock,
-            `"${item.supplier}"`
-        ].join(';'))
-    ];
-    const csvString = csvRows.join('\n');
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'relatorio_estoque_baixo.csv';
-    link.click();
+  const formatSupplier = (supplier: string | string[] | undefined): string => {
+      if (Array.isArray(supplier)) {
+          return supplier.join(', ');
+      }
+      return supplier || 'N/A';
   };
   
   const handlePrint = () => {
@@ -65,10 +113,19 @@ const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems 
 
   return (
     <div>
-        <div className="flex justify-end space-x-2 mb-4">
-            <button onClick={handleExportCsv} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Exportar para CSV</button>
+        <div className="flex justify-between items-center mb-4 no-print">
+            <input 
+                type="text"
+                placeholder="Filtrar por código ou descrição..."
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+                className="p-2 border border-gray-300 rounded-md text-sm w-full max-w-xs"
+            />
+            <div className="flex space-x-2">
+                <button onClick={() => printContent(reportPrintRef.current, 'Relatório de Itens Abaixo do Mínimo')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Gerar Relatório</button>
+            </div>
         </div>
-        <div className="border rounded-md p-4">
+        <div ref={reportPrintRef} className="border rounded-md p-4">
             <h4 className="font-bold">Itens Abaixo do Mínimo</h4>
             <p className="text-xs text-gray-500 mb-4">Data de Geração: {new Date().toLocaleString('pt-BR')}</p>
             <table className="w-full text-left">
@@ -78,7 +135,7 @@ const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems 
                         <th className="p-2 text-sm font-semibold text-gray-600">DESCRIÇÃO</th>
                         <th className="p-2 text-sm font-semibold text-gray-600">QTD. REAL</th>
                         <th className="p-2 text-sm font-semibold text-gray-600">QTD. MÍNIMA</th>
-                        <th className="p-2 text-sm font-semibold text-gray-600">Descrição do pedido</th>
+                        <th className="p-2 text-sm font-semibold text-gray-600">FORNECEDOR</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -88,20 +145,70 @@ const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems 
                             <td className="p-2 text-sm">{item.description}</td>
                             <td className="p-2 text-sm text-red-600 font-bold">{item.systemStock}</td>
                             <td className="p-2 text-sm">{item.minStock}</td>
-                            <td className="p-2"><input type="text" placeholder="Ex: Pedir 2 caixas" value={pedidoItems[item.code] || ''} onChange={e => handlePedidoChange(item.code, e.target.value)} className="w-40 p-1 border border-gray-300 rounded-md" /></td>
+                            <td className="p-2 text-sm">{formatSupplier(item.supplier)}</td>
                         </tr>
                     ))}
                      {itemsAbaixoMinimo.length === 0 && (
-                        <tr><td colSpan={5} className="text-center p-4 text-gray-500">Nenhum item abaixo do estoque mínimo.</td></tr>
+                        <tr><td colSpan={5} className="text-center p-4 text-gray-500">
+                           {filterText ? "Nenhum item corresponde ao filtro." : "Nenhum item abaixo do estoque mínimo."}
+                        </td></tr>
                      )}
                 </tbody>
             </table>
-             <div className="flex justify-end mt-4">
-                <button onClick={handlePrint} disabled={itemsParaPedir.length === 0} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                   🖨️ Imprimir Pedido ({itemsParaPedir.length})
+             <div className="flex justify-end mt-4 no-print">
+                <button onClick={() => setShowPedidoModal(true)} disabled={itemsAbaixoMinimo.length === 0} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                   Realizar Pedido
                 </button>
             </div>
         </div>
+        
+        {showPedidoModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white p-6 rounded-lg shadow-xl max-w-6xl w-full flex flex-col">
+                    <div className="flex justify-between items-center border-b pb-3 mb-4">
+                        <h3 className="text-lg font-bold text-gray-800">Realizar Pedido de Compra</h3>
+                        <button onClick={() => setShowPedidoModal(false)} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                    </div>
+                    <div className="max-h-[70vh] overflow-y-auto">
+                        <table className="w-full text-left">
+                            <thead className="sticky top-0 bg-gray-50">
+                                <tr className="border-b">
+                                    <th className="p-2 text-sm font-semibold text-gray-600">CÓDIGO</th>
+                                    <th className="p-2 text-sm font-semibold text-gray-600">DESCRIÇÃO</th>
+                                    <th className="p-2 text-sm font-semibold text-gray-600">FORNECEDOR</th>
+                                    <th className="p-2 text-sm font-semibold text-gray-600">Descrição do pedido*</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {itemsAbaixoMinimo.map(item => (
+                                    <tr key={item.id} className="border-b">
+                                        <td className="p-2 text-sm">{item.code}</td>
+                                        <td className="p-2 text-sm">{item.description}</td>
+                                        <td className="p-2 text-sm">{formatSupplier(item.supplier)}</td>
+                                        <td className="p-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Obrigatório para incluir no pedido" 
+                                                value={pedidoItems[item.code] || ''} 
+                                                onChange={e => handlePedidoChange(item.code, e.target.value)} 
+                                                className="w-full p-1 border border-gray-300 rounded-md"
+                                                required
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="flex justify-end space-x-2 pt-4 border-t mt-4">
+                        <button onClick={handlePrint} disabled={itemsParaPedir.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                           🖨️ Imprimir Pedido ({itemsParaPedir.length})
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="hidden">
             <div ref={printRef} className="p-4">
                 <h1 className="text-xl font-bold mb-4">Pedido de Compra de Itens</h1>
@@ -120,7 +227,7 @@ const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems 
                             <tr key={item.id}>
                                 <td className="border p-2">{item.code}</td>
                                 <td className="border p-2">{item.description}</td>
-                                <td className="border p-2">{item.supplier}</td>
+                                <td className="border p-2">{formatSupplier(item.supplier)}</td>
                                 <td className="border p-2">{pedidoItems[item.code]}</td>
                             </tr>
                         ))}
@@ -135,10 +242,9 @@ const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems 
 const MovimentacaoReport: React.FC<{ stockItems: StockItem[], historyData: Record<string, ItemHistory[]> }> = ({ stockItems, historyData }) => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const reportPrintRef = useRef<HTMLDivElement>(null);
 
     const allHistory = useMemo(() => {
-        // FIX: Replaced Object.entries with Object.keys to fix a type inference issue where
-        // the value from the record was being typed as 'unknown' instead of 'ItemHistory[]'.
         return Object.keys(historyData)
             .flatMap((itemId) => {
                 const histories = historyData[itemId];
@@ -169,30 +275,9 @@ const MovimentacaoReport: React.FC<{ stockItems: StockItem[], historyData: Recor
       });
     }, [allHistory, startDate, endDate]);
 
-    const handleExportCsv = () => {
-        const headers = ["Data", "Cód. Item", "Descrição", "Tipo", "Quantidade", "Usuário", "Setor/Solicitante", "Responsável", "Detalhes Entrada"];
-        const csvRows = [
-            headers.join(';'),
-            ...filteredHistory.map(row => {
-                const base = [row.date, row.code, `"${row.description.replace(/"/g, '""')}"`, row.type, row.quantity, row.user];
-                if (row.type === 'Saída') {
-                    return [...base, `"${row.requester.replace(/"/g, '""')}"`, `"${row.responsible.replace(/"/g, '""')}"`, ''].join(';');
-                } else { // Entrada
-                    return [...base, '', '', `"${row.details.replace(/"/g, '""')}"`].join(';');
-                }
-            })
-        ];
-        const csvString = csvRows.join('\n');
-        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `relatorio_movimentacao_${new Date().toISOString().slice(0,10)}.csv`;
-        link.click();
-    };
-
     return (
         <div>
-            <div className="flex justify-between items-end mb-4">
+            <div className="flex justify-between items-end mb-4 no-print">
                 <div className="flex items-end space-x-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Data de Início</label>
@@ -203,9 +288,9 @@ const MovimentacaoReport: React.FC<{ stockItems: StockItem[], historyData: Recor
                         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border border-gray-300 rounded-md" />
                     </div>
                 </div>
-                <button onClick={handleExportCsv} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Exportar para CSV</button>
+                <button onClick={() => printContent(reportPrintRef.current, 'Relatório de Movimentações')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Gerar Relatório</button>
             </div>
-            <div className="border rounded-md p-4">
+            <div ref={reportPrintRef} className="border rounded-md p-4">
                 <h4 className="font-bold">Movimentações por Período</h4>
                 <p className="text-xs text-gray-500 mb-4">Data de Geração: {new Date().toLocaleString('pt-BR')}</p>
                 <div className="max-h-96 overflow-y-auto">
@@ -247,6 +332,7 @@ const MovimentacaoReport: React.FC<{ stockItems: StockItem[], historyData: Recor
 };
 
 const ValorPorLocalReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems }) => {
+    const reportPrintRef = useRef<HTMLDivElement>(null);
     const valorPorLocal = useMemo(() => {
         const data = stockItems.reduce((acc, item) => {
             const location = item.location || 'Não Localizado';
@@ -258,8 +344,6 @@ const ValorPorLocalReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems
             return acc;
         }, {} as Record<string, { itemCount: number, totalValue: number }>);
 
-        // FIX: Replaced Object.entries with Object.keys to fix a type inference issue where
-        // the value from the record was being typed as 'unknown', which is not a spreadable type.
         return Object.keys(data).map((location) => {
             const values = data[location];
             return {
@@ -269,30 +353,12 @@ const ValorPorLocalReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems
         }).sort((a, b) => b.totalValue - a.totalValue);
     }, [stockItems]);
 
-    const handleExportCsv = () => {
-        const headers = ["Localização", "Qtd. Itens no Local", "Valor Total em Estoque (R$)"];
-        const csvRows = [
-            headers.join(';'),
-            ...valorPorLocal.map(item => [
-                `"${item.location}"`,
-                item.itemCount,
-                item.totalValue.toFixed(2).replace('.', ',')
-            ].join(';'))
-        ];
-        const csvString = csvRows.join('\n');
-        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `relatorio_valor_por_local.csv`;
-        link.click();
-    };
-
     return (
         <div>
-            <div className="flex justify-end mb-4">
-                <button onClick={handleExportCsv} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Exportar para CSV</button>
+            <div className="flex justify-end mb-4 no-print">
+                <button onClick={() => printContent(reportPrintRef.current, 'Relatório de Valor por Localização')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Gerar Relatório</button>
             </div>
-            <div className="border rounded-md p-4">
+            <div ref={reportPrintRef} className="border rounded-md p-4">
                 <h4 className="font-bold">Valor Consolidado por Localização</h4>
                 <p className="text-xs text-gray-500 mb-4">Data de Geração: {new Date().toLocaleString('pt-BR')}</p>
                 <table className="w-full text-left">
@@ -341,7 +407,7 @@ const RelatoriosPage: React.FC<RelatoriosPageProps> = ({ title, stockItems, hist
     <div>
         <h1 className="text-2xl font-semibold text-gray-800 mb-6">{title}</h1>
         <div className="bg-white p-6 rounded-lg shadow-md">
-             <nav className="mb-4 border-b">
+             <nav className="mb-4 border-b no-print">
                 <button onClick={() => setActiveTab('abaixoMinimo')} className={`py-2 px-4 inline-block text-sm font-medium ${activeTab === 'abaixoMinimo' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 border-b-2 border-transparent'}`}>Itens Abaixo do Mínimo</button>
                 <button onClick={() => setActiveTab('movimentacao')} className={`py-2 px-4 inline-block text-sm font-medium ${activeTab === 'movimentacao' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 border-b-2 border-transparent'}`}>Movimentação por Período</button>
                 <button onClick={() => setActiveTab('valorPorLocal')} className={`py-2 px-4 inline-block text-sm font-medium ${activeTab === 'valorPorLocal' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 border-b-2 border-transparent'}`}>Valor por Local</button>
