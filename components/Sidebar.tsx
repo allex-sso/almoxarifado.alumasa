@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ICONS, AlumasaLogo } from '../constants';
@@ -13,6 +11,8 @@ interface NavItem {
 
 interface SidebarProps {
   onLogout: () => void;
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
 }
 
 const navItems: NavItem[] = [
@@ -51,7 +51,7 @@ const navItems: NavItem[] = [
     { path: '/relatorios', icon: ICONS.reports, label: 'Relatórios' },
 ];
 
-const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onLogout, isOpen, setIsOpen }) => {
     const location = useLocation();
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
@@ -72,10 +72,21 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
         return subItems.some(sub => location.pathname.startsWith(sub.path));
     };
 
+    const handleLinkClick = () => {
+        if (window.innerWidth < 768) { // Corresponds to md breakpoint
+            setIsOpen(false);
+        }
+    };
+
     return (
-        <aside className="bg-[#002B4E] text-blue-100 flex-shrink-0 w-60 flex flex-col">
-            <div className="flex items-center justify-start h-16 px-4 border-b border-blue-900/50">
+        <aside className={`bg-[#002B4E] text-blue-100 flex-shrink-0 w-60 flex flex-col fixed md:static inset-y-0 left-0 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-200 ease-in-out z-30`}>
+            <div className="flex items-center justify-between h-16 px-4 border-b border-blue-900/50">
                 <AlumasaLogo />
+                <button onClick={() => setIsOpen(false)} className="md:hidden p-1 text-blue-300 rounded-md hover:bg-blue-800 hover:text-white">
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
             <nav className="flex-1 mt-4 px-2">
                 <ul>
@@ -99,6 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                                                 <li key={subItem.path}>
                                                     <NavLink 
                                                         to={subItem.path} 
+                                                        onClick={handleLinkClick}
                                                         className={({ isActive }) => `block w-full py-2 px-4 my-0.5 rounded-md text-sm transition-colors duration-200 hover:bg-blue-800 ${isActive ? 'bg-blue-600 text-white' : 'text-blue-300'}`
                                                     }>
                                                         {subItem.label}
@@ -111,6 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
                             ) : (
                                 <NavLink 
                                     to={item.path!} 
+                                    onClick={handleLinkClick}
                                     className={({ isActive }) => `flex items-center py-2.5 px-3 rounded-md transition-colors duration-200 hover:bg-blue-800 text-sm ${isActive ? 'bg-blue-600 text-white' : 'text-blue-300'}`
                                 }>
                                     {item.icon}

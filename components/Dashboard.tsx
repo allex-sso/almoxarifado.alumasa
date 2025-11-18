@@ -32,10 +32,17 @@ const Painel: React.FC<PainelProps> = ({ stockItems, historyData }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const parseDate = (dateString: string) => {
-    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) return null;
+  const parseDate = (dateString: string | null | undefined) => {
+    if (!dateString || !/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) return null;
     const [day, month, year] = dateString.split('/').map(Number);
-    return new Date(year, month - 1, day);
+    if (isNaN(day) || isNaN(month) || isNaN(year) || month < 1 || month > 12 || day < 1 || day > 31) {
+      return null;
+    }
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return null;
+    }
+    return date;
   };
 
   const filteredData = useMemo(() => {
@@ -62,10 +69,15 @@ const Painel: React.FC<PainelProps> = ({ stockItems, historyData }) => {
 
         if (isAfterStart && isBeforeEnd) {
           if (history.type === 'Entrada') {
-            totalEntradas += history.quantity;
+            totalEntradas += (history.quantity || 0);
           } else if (history.type === 'Saída') {
-            totalSaidas += history.quantity;
-            const consumedValue = (consumptionMap.get(item.description) || 0) + (history.quantity * item.value);
+            const quantity = Number(history.quantity);
+            const value = Number(item.value);
+            const safeQuantity = isNaN(quantity) ? 0 : quantity;
+            const safeValue = isNaN(value) ? 0 : value;
+
+            totalSaidas += safeQuantity;
+            const consumedValue = (consumptionMap.get(item.description) || 0) + (safeQuantity * safeValue);
             consumptionMap.set(item.description, consumedValue);
           }
         }
@@ -86,11 +98,20 @@ const Painel: React.FC<PainelProps> = ({ stockItems, historyData }) => {
     if (!stockItems || stockItems.length === 0) return [];
 
     const categoryMap = new Map<string, { value: number, items: number }>();
-    const totalValue = stockItems.reduce((acc, item) => acc + (item.system_stock * item.value), 0);
+    
+    const totalValue = stockItems.reduce((acc, item) => {
+        const stock = Number(item.system_stock);
+        const value = Number(item.value);
+        const itemValue = (isNaN(stock) ? 0 : stock) * (isNaN(value) ? 0 : value);
+        return acc + itemValue;
+    }, 0);
 
     stockItems.forEach(item => {
         const category = item.category || 'Sem Categoria';
-        const itemValue = item.system_stock * item.value;
+        const stock = Number(item.system_stock);
+        const value = Number(item.value);
+        const itemValue = (isNaN(stock) ? 0 : stock) * (isNaN(value) ? 0 : value);
+
         const current = categoryMap.get(category) || { value: 0, items: 0 };
         current.value += itemValue;
         current.items += 1;
@@ -124,8 +145,14 @@ const Painel: React.FC<PainelProps> = ({ stockItems, historyData }) => {
   const displayTopConsumed = topConsumed
 
   const maxBarValue = Math.max(...displayTopConsumed.map(item => item.value), 1);
-  const itemsAbaixoMinimo = stockItems.filter(i => i.system_stock <= i.min_stock).length;
-  const totalValue = stockItems.reduce((acc, item) => acc + (item.system_stock * item.value), 0);
+  const itemsAbaixoMinimo = stockItems.filter(i => (i.system_stock || 0) <= (i.min_stock || 0)).length;
+  
+  const totalValue = stockItems.reduce((acc, item) => {
+    const stock = Number(item.system_stock);
+    const value = Number(item.value);
+    const itemValue = (isNaN(stock) ? 0 : stock) * (isNaN(value) ? 0 : value);
+    return acc + itemValue;
+  }, 0);
 
   const icons = {
     estoque: <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-1.414 1.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-1.414-1.414A1 1 0 006.586 13H4" /></svg>,

@@ -1,11 +1,5 @@
 
 
-
-
-
-
-
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StockItem, ItemHistory, Supplier, WAREHOUSE_CATEGORIES } from '../types';
@@ -42,7 +36,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ stockItems, showTo
       const counted = countedItems[item.id];
       if (counted !== undefined) {
           const diff = counted - item.system_stock;
-          return acc + (diff * item.value);
+          return acc + (diff * (item.value || 0));
       }
       return acc;
   }, 0);
@@ -86,41 +80,43 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ stockItems, showTo
                 </p>
             </div>
         </div>
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-gray-50 border-b">
-              <th className="p-3 text-sm font-semibold text-gray-600">CÓDIGO</th>
-              <th className="p-3 text-sm font-semibold text-gray-600">DESCRIÇÃO</th>
-              <th className="p-3 text-sm font-semibold text-gray-600">ESTOQUE (SISTEMA)</th>
-              <th className="p-3 text-sm font-semibold text-gray-600">QTD. CONTADA</th>
-              <th className="p-3 text-sm font-semibold text-gray-600">DIFERENÇA</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stockItems.map(item => {
-              const counted = countedItems[item.id];
-              const difference = counted !== undefined ? counted - item.system_stock : undefined;
-              return (
-                <tr key={item.id} className={`border-b ${difference !== undefined && difference !== 0 ? 'bg-yellow-50' : ''}`}>
-                  <td className="p-2 text-sm text-gray-800 font-medium">{item.code}</td>
-                  <td className="p-2 text-sm text-gray-500">{item.description}</td>
-                  <td className="p-2 text-sm text-gray-500">{item.system_stock}</td>
-                  <td className="p-2">
-                      <input 
-                          type="number" 
-                          className="w-24 p-1 border border-gray-300 rounded-md"
-                          value={counted ?? ''}
-                          onChange={(e) => handleCountChange(item.id, e.target.value)}
-                      />
-                  </td>
-                  <td className={`p-2 text-sm font-bold ${difference === undefined ? 'text-gray-500' : difference > 0 ? 'text-green-600' : difference < 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                      {difference !== undefined ? (difference > 0 ? `+${difference}` : difference) : '-'}
-                  </td>
+        <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[640px]">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  <th className="p-3 text-sm font-semibold text-gray-600">CÓDIGO</th>
+                  <th className="p-3 text-sm font-semibold text-gray-600">DESCRIÇÃO</th>
+                  <th className="p-3 text-sm font-semibold text-gray-600">ESTOQUE (SISTEMA)</th>
+                  <th className="p-3 text-sm font-semibold text-gray-600">QTD. CONTADA</th>
+                  <th className="p-3 text-sm font-semibold text-gray-600">DIFERENÇA</th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {stockItems.map(item => {
+                  const counted = countedItems[item.id];
+                  const difference = counted !== undefined ? counted - item.system_stock : undefined;
+                  return (
+                    <tr key={item.id} className={`border-b ${difference !== undefined && difference !== 0 ? 'bg-yellow-50' : ''}`}>
+                      <td className="p-2 text-sm text-gray-800 font-medium">{item.code}</td>
+                      <td className="p-2 text-sm text-gray-500">{item.description}</td>
+                      <td className="p-2 text-sm text-gray-500">{item.system_stock}</td>
+                      <td className="p-2">
+                          <input 
+                              type="number" 
+                              className="w-24 p-1 border border-gray-300 rounded-md"
+                              value={counted ?? ''}
+                              onChange={(e) => handleCountChange(item.id, e.target.value)}
+                          />
+                      </td>
+                      <td className={`p-2 text-sm font-bold ${difference === undefined ? 'text-gray-500' : difference > 0 ? 'text-green-600' : difference < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                          {difference !== undefined ? (difference > 0 ? `+${difference}` : difference) : '-'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+        </div>
         <div className="flex justify-end mt-4">
           <button onClick={handleSaveInventory} disabled={divergenceItems.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
               Salvar Inventário ({divergenceItems.length} itens para ajustar)
@@ -671,14 +667,20 @@ export const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, suppliers,
 
 
   const isFilterActive = new URLSearchParams(location.search).get('filtro') === 'abaixo-minimo';
-  const totalValue = displayedItems.reduce((acc, item) => acc + (item.system_stock * item.value), 0);
+  
+  const totalValue = displayedItems.reduce((acc, item) => {
+    const stock = Number(item.system_stock);
+    const value = Number(item.value);
+    const itemValue = (isNaN(stock) ? 0 : stock) * (isNaN(value) ? 0 : value);
+    return acc + itemValue;
+  }, 0);
 
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">Estoque Atual</h1>
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex justify-between items-center mb-4">
-            <div className="relative text-gray-500 w-full max-w-md">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-4">
+            <div className="relative text-gray-500 w-full md:max-w-md">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21L15.803 15.803M15.803 15.803A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
                 </span>
@@ -690,17 +692,17 @@ export const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, suppliers,
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
-            <div className="flex items-center space-x-4">
-                 <p className="text-gray-600 text-sm hidden md:block">Total (filtrado): <span className="font-bold text-blue-600">{totalValue.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span></p>
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4 w-full md:w-auto">
+                 <p className="text-gray-600 text-sm hidden lg:block">Total (filtrado): <span className="font-bold text-blue-600">{totalValue.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span></p>
                  <button
                   onClick={() => setShowMultiQrModal(true)}
                   disabled={selectedItems.length === 0}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                 >
-                  Gerar Etiquetas ({selectedItems.length})
+                  Etiquetas ({selectedItems.length})
                 </button>
-                <button onClick={() => setShowBulkImportModal(true)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">Importar</button>
-                <button onClick={() => setIsAddItemPanelOpen(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md">+ Novo Item</button>
+                <button onClick={() => setShowBulkImportModal(true)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md flex-shrink-0">Importar</button>
+                <button onClick={() => setIsAddItemPanelOpen(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md flex-shrink-0">+ Novo Item</button>
             </div>
         </div>
         
@@ -749,7 +751,7 @@ export const EstoquePage: React.FC<EstoquePageProps> = ({ stockItems, suppliers,
                     <td className="p-3 text-sm text-gray-500">{item.location}</td>
                     <td className="p-3 text-sm text-gray-500">{item.system_stock}</td>
                     <td className="p-3 text-sm text-gray-500">{item.min_stock}</td>
-                    <td className="p-3 text-sm text-gray-500">{item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="p-3 text-sm text-gray-500">{(item.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                     <td className="p-3 text-sm text-gray-500 text-center">
                         <div className="relative inline-block text-left" data-menu-container="true">
                             <button onClick={() => setActiveActionMenu(activeActionMenu === item.id ? null : item.id)} className="p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">

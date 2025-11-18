@@ -126,13 +126,13 @@ const AbaixoMinimoReport: React.FC<{ stockItems: StockItem[], suppliers: Supplie
 
   return (
     <div>
-        <div className="flex justify-between items-center mb-4 no-print">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-4 no-print gap-2">
             <input 
                 type="text"
                 placeholder="Filtrar por código ou descrição..."
                 value={filterText}
                 onChange={e => setFilterText(e.target.value)}
-                className="p-2 border border-gray-300 rounded-md text-sm w-full max-w-xs"
+                className="p-2 border border-gray-300 rounded-md text-sm w-full md:max-w-xs"
             />
             <div className="flex space-x-2">
                 <button onClick={() => printContent(reportPrintRef.current, 'Relatório de Itens Abaixo do Mínimo')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Gerar Relatório</button>
@@ -283,7 +283,16 @@ const MovimentacaoReport: React.FC<{ stockItems: StockItem[], historyData: Recor
                     description: item?.description || 'Item não encontrado'
                 }));
             })
-            .sort((a, b) => new Date(b.date.split('/').reverse().join('-')).getTime() - new Date(a.date.split('/').reverse().join('-')).getTime());
+            .sort((a, b) => {
+                try {
+                    const dateA = a.date ? new Date(a.date.split('/').reverse().join('-')).getTime() : 0;
+                    const dateB = b.date ? new Date(b.date.split('/').reverse().join('-')).getTime() : 0;
+                    if (isNaN(dateA) || isNaN(dateB)) return 0;
+                    return dateB - dateA;
+                } catch (e) {
+                    return 0;
+                }
+            });
     }, [historyData, stockItems]);
 
     const filteredHistory = useMemo(() => {
@@ -295,17 +304,23 @@ const MovimentacaoReport: React.FC<{ stockItems: StockItem[], historyData: Recor
       if (!start && !end) return allHistory;
 
       return allHistory.filter(h => {
-        const historyDate = new Date(h.date.split('/').reverse().join('-'));
-        const isAfterStart = start ? historyDate >= start : true;
-        const isBeforeEnd = end ? historyDate <= end : true;
-        return isAfterStart && isBeforeEnd;
+        try {
+            if (!h.date) return false;
+            const historyDate = new Date(h.date.split('/').reverse().join('-'));
+            if (isNaN(historyDate.getTime())) return false;
+            const isAfterStart = start ? historyDate >= start : true;
+            const isBeforeEnd = end ? historyDate <= end : true;
+            return isAfterStart && isBeforeEnd;
+        } catch (e) {
+            return false;
+        }
       });
     }, [allHistory, startDate, endDate]);
 
     return (
         <div>
-            <div className="flex justify-between items-end mb-4 no-print">
-                <div className="flex items-end space-x-4">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-4 no-print gap-4">
+                <div className="flex flex-col sm:flex-row items-end space-y-2 sm:space-y-0 sm:space-x-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Data de Início</label>
                         <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border border-gray-300 rounded-md" />
@@ -315,7 +330,7 @@ const MovimentacaoReport: React.FC<{ stockItems: StockItem[], historyData: Recor
                         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border border-gray-300 rounded-md" />
                     </div>
                 </div>
-                <button onClick={() => printContent(reportPrintRef.current, 'Relatório de Movimentações')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm">Gerar Relatório</button>
+                <button onClick={() => printContent(reportPrintRef.current, 'Relatório de Movimentações')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md text-sm w-full md:w-auto">Gerar Relatório</button>
             </div>
             <div ref={reportPrintRef} className="border rounded-md p-4">
                 <h4 className="font-bold">Movimentações por Período</h4>
@@ -367,7 +382,10 @@ const ValorPorLocalReport: React.FC<{ stockItems: StockItem[] }> = ({ stockItems
                 acc[location] = { itemCount: 0, totalValue: 0 };
             }
             acc[location].itemCount++;
-            acc[location].totalValue += item.system_stock * item.value;
+            const stock = Number(item.system_stock);
+            const value = Number(item.value);
+            const itemValue = (isNaN(stock) ? 0 : stock) * (isNaN(value) ? 0 : value);
+            acc[location].totalValue += itemValue;
             return acc;
         }, {} as Record<string, { itemCount: number, totalValue: number }>);
 

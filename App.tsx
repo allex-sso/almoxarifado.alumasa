@@ -1,6 +1,8 @@
 
+
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Routes, Route, Navigate, useLocation, Link, useParams } from 'react-router-dom';
+// FIX: Using direct named imports for react-router-dom to ensure correct types.
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
@@ -11,6 +13,15 @@ import RelatoriosPage from './components/PlaceholderPage';
 import AuditPage from './components/AuditPage';
 import { User, Supplier, StockItem, AuditLog, ItemHistory, EntryItemHistory, ExitItemHistory } from './types';
 import { supabase } from './supabaseClient';
+
+// ============================================================================
+// Page Wrapper Component
+// ============================================================================
+const PageWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => (
+    <div className="p-4 sm:p-6">
+      {children}
+    </div>
+);
 
 
 // ============================================================================
@@ -25,6 +36,7 @@ interface MovimentacoesPageProps {
 }
 
 const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppliers, onRegisterEntry, onRegisterExit, showToast }) => {
+    // FIX: useParams was untyped due to incorrect import style. Now it is correctly typed.
     const { tab = 'nova-entrada' } = useParams<{ tab: string }>();
     const [search, setSearch] = useState('');
     const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
@@ -149,7 +161,7 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
                                <p className="text-sm text-blue-600 mt-2">Estoque atual: <span className="font-bold">{selectedItem.system_stock}</span> {selectedItem.unit}(s)</p>
                             )}
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade*</label>
                                 <input type="number" name="quantity" placeholder="Exemplo: 10" className="w-full p-2 border border-gray-300 rounded-md" value={quantity} onChange={e => setQuantity(e.target.value)} required />
@@ -215,7 +227,7 @@ const MovimentacoesPage: React.FC<MovimentacoesPageProps> = ({ stockItems, suppl
                           <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade*</label>
                           <input type="number" name="quantity" placeholder="Exemplo: 100" className="w-full p-2 border border-gray-300 rounded-md" value={quantity} onChange={e => setQuantity(e.target.value)} required />
                       </div>
-                     <div className="grid grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
                             <select 
@@ -286,6 +298,7 @@ const ControlePage: React.FC<ControlePageProps> = ({
     onAddSupplier, onUpdateSupplier, onDeleteSupplier,
     showToast
 }) => {
+    // FIX: useParams was untyped due to incorrect import style. Now it is correctly typed.
     const { tab = 'usuarios' } = useParams<{ tab: string }>();
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 10;
@@ -490,44 +503,46 @@ const ControlePage: React.FC<ControlePageProps> = ({
                           <h2 className="text-xl font-semibold text-gray-800">Gerenciamento de Usuários</h2>
                           <button onClick={() => openPanel('addUser')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">+ Novo Usuário</button>
                       </div>
-                      <table className="w-full text-left">
-                          <thead>
-                              <tr className="bg-gray-50 border-b">
-                                  <th className="p-3 text-sm font-semibold text-gray-600">FOTO</th>
-                                  <th className="p-3 text-sm font-semibold text-gray-600">NOME</th>
-                                  <th className="p-3 text-sm font-semibold text-gray-600">E-MAIL</th>
-                                  <th className="p-3 text-sm font-semibold text-gray-600">PERFIL</th>
-                                  <th className="p-3 text-sm font-semibold text-gray-600">AÇÕES</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              {paginatedUsers.map(user => (
-                                  <tr key={user.id} className="border-b">
-                                      <td className="p-3"><img src={user.avatar_url} alt={user.name} className="w-8 h-8 rounded-full" /></td>
-                                      <td className="p-3 text-sm text-gray-800">{user.name}</td>
-                                      <td className="p-3 text-sm text-gray-500">{user.email}</td>
-                                      <td className="p-3"><span className={`px-2 py-1 text-xs rounded-full ${user.profile === 'Administrador' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{user.profile}</span></td>
-                                      <td className="p-3 text-gray-500 flex items-center space-x-3">
-                                          <button onClick={() => openPanel('editUser', user)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
-                                              </svg>
-                                          </button>
-                                          <button onClick={() => openPanel('changePassword', user)} className="hover:text-yellow-600 transition-colors duration-200" title="Alterar Senha">
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                              </svg>
-                                          </button>
-                                          <button onClick={() => setUserToDelete(user)} className="hover:text-red-600 transition-colors duration-200" title="Excluir">
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                              </svg>
-                                          </button>
-                                      </td>
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left min-w-[768px]">
+                            <thead>
+                                <tr className="bg-gray-50 border-b">
+                                    <th className="p-3 text-sm font-semibold text-gray-600">FOTO</th>
+                                    <th className="p-3 text-sm font-semibold text-gray-600">NOME</th>
+                                    <th className="p-3 text-sm font-semibold text-gray-600">E-MAIL</th>
+                                    <th className="p-3 text-sm font-semibold text-gray-600">PERFIL</th>
+                                    <th className="p-3 text-sm font-semibold text-gray-600">AÇÕES</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedUsers.map(user => (
+                                    <tr key={user.id} className="border-b">
+                                        <td className="p-3"><img src={user.avatar_url} alt={user.name} className="w-8 h-8 rounded-full" /></td>
+                                        <td className="p-3 text-sm text-gray-800">{user.name}</td>
+                                        <td className="p-3 text-sm text-gray-500">{user.email}</td>
+                                        <td className="p-3"><span className={`px-2 py-1 text-xs rounded-full ${user.profile === 'Administrador' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{user.profile}</span></td>
+                                        <td className="p-3 text-gray-500 flex items-center space-x-3">
+                                            <button onClick={() => openPanel('editUser', user)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
+                                                </svg>
+                                            </button>
+                                            <button onClick={() => openPanel('changePassword', user)} className="hover:text-yellow-600 transition-colors duration-200" title="Alterar Senha">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                </svg>
+                                            </button>
+                                            <button onClick={() => setUserToDelete(user)} className="hover:text-red-600 transition-colors duration-200" title="Excluir">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                      </div>
                        {totalUserPages > 1 && (
                             <div className="flex justify-between items-center mt-4 text-sm text-gray-600">
                                 <p>Mostrando {paginatedUsers.length} de {users.length} registros</p>
@@ -549,39 +564,41 @@ const ControlePage: React.FC<ControlePageProps> = ({
                             <h2 className="text-xl font-semibold text-gray-800">Gerenciamento de Fornecedores</h2>
                             <button onClick={() => openPanel('addSupplier')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">+ Novo</button>
                         </div>
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="bg-gray-50 border-b">
-                                    <th className="p-3 text-sm font-semibold text-gray-600">NOME</th>
-                                    <th className="p-3 text-sm font-semibold text-gray-600">CONTATO</th>
-                                    <th className="p-3 text-sm font-semibold text-gray-600">E-MAIL</th>
-                                    <th className="p-3 text-sm font-semibold text-gray-600">TELEFONE</th>
-                                    <th className="p-3 text-sm font-semibold text-gray-600">AÇÕES</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedSuppliers.map(sup => (
-                                    <tr key={sup.id} className="border-b">
-                                        <td className="p-3 text-sm text-gray-800">{sup.name}</td>
-                                        <td className="p-3 text-sm text-gray-500">{sup.contact}</td>
-                                        <td className="p-3 text-sm text-gray-500">{sup.email}</td>
-                                        <td className="p-3 text-sm text-gray-500">{sup.phone}</td>
-                                        <td className="p-3 text-gray-500 flex items-center space-x-3">
-                                            <button onClick={() => openPanel('editSupplier', sup)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
-                                                </svg>
-                                            </button>
-                                            <button onClick={() => setSupplierToDelete(sup)} className="hover:text-red-600 transition-colors duration-200" title="Excluir">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        </td>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left min-w-[768px]">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b">
+                                        <th className="p-3 text-sm font-semibold text-gray-600">NOME</th>
+                                        <th className="p-3 text-sm font-semibold text-gray-600">CONTATO</th>
+                                        <th className="p-3 text-sm font-semibold text-gray-600">E-MAIL</th>
+                                        <th className="p-3 text-sm font-semibold text-gray-600">TELEFONE</th>
+                                        <th className="p-3 text-sm font-semibold text-gray-600">AÇÕES</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {paginatedSuppliers.map(sup => (
+                                        <tr key={sup.id} className="border-b">
+                                            <td className="p-3 text-sm text-gray-800">{sup.name}</td>
+                                            <td className="p-3 text-sm text-gray-500">{sup.contact}</td>
+                                            <td className="p-3 text-sm text-gray-500">{sup.email}</td>
+                                            <td className="p-3 text-sm text-gray-500">{sup.phone}</td>
+                                            <td className="p-3 text-gray-500 flex items-center space-x-3">
+                                                <button onClick={() => openPanel('editSupplier', sup)} className="hover:text-blue-600 transition-colors duration-200" title="Editar">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
+                                                    </svg>
+                                                </button>
+                                                <button onClick={() => setSupplierToDelete(sup)} className="hover:text-red-600 transition-colors duration-200" title="Excluir">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                         {totalSupplierPages > 1 && (
                             <div className="flex justify-between items-center mt-4 text-sm text-gray-600">
                                 <p>Mostrando {paginatedSuppliers.length} de {suppliers.length} registros</p>
@@ -590,7 +607,7 @@ const ControlePage: React.FC<ControlePageProps> = ({
                                     <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-2 py-1 border rounded-md disabled:opacity-50">Anterior</button>
                                     <span className="px-3 py-1 bg-gray-200 rounded-md">Página {currentPage} de {totalSupplierPages}</span>
                                     <button onClick={() => setCurrentPage(p => Math.min(totalSupplierPages, p + 1))} disabled={currentPage === totalSupplierPages} className="px-2 py-1 border rounded-md disabled:opacity-50">Próxima</button>
-                                    <button onClick={() => setCurrentPage(totalSupplierPages)} disabled={currentPage === totalSupplierPages} className="px-2 py-1 border rounded-md disabled:opacity-50">Última</button>
+                                    <button onClick={() => setCurrentPage(totalUserPages)} disabled={currentPage === totalUserPages} className="px-2 py-1 border rounded-md disabled:opacity-50">Última</button>
                                 </div>
                             </div>
                         )}
@@ -671,29 +688,9 @@ const ControlePage: React.FC<ControlePageProps> = ({
 // Main App Component
 // ============================================================================
 
-// Helper para adicionar um timeout a uma promise
-const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error(`A solicitação excedeu o tempo limite de ${ms}ms`));
-    }, ms);
-
-    promise
-      .then(res => {
-        clearTimeout(timeoutId);
-        resolve(res);
-      })
-      .catch(err => {
-        clearTimeout(timeoutId);
-        reject(err);
-      });
-  });
-};
-
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [isDataLoading, setIsDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -706,6 +703,8 @@ const App: React.FC = () => {
   
   const [toastMessage, setToastMessage] = useState('');
   const toastTimeoutRef = useRef<number | null>(null);
+  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const showToast = useCallback((message: string) => {
     if (toastTimeoutRef.current) {
@@ -725,21 +724,39 @@ const App: React.FC = () => {
         auditLogsRes,
         historyDataRes,
     ] = await Promise.all([
-        supabase.from('stock_items').select('*'),
+        supabase.from('stock_items').select('id, code, description, category, equipment, location, unit, system_stock, min_stock, value, supplier_id'),
         supabase.from('users').select('*'),
         supabase.from('suppliers').select('*'),
         supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200),
         supabase.from('item_history').select('*'),
     ]);
-    
-    const responses = [stockItemsRes, allUsersRes, suppliersRes, auditLogsRes, historyDataRes];
-    for (const res of responses) {
-        if (res.error && res.error.code !== 'PGRST116') throw res.error;
-    }
 
-    if (stockItemsRes.data) setStockItems(stockItemsRes.data as any);
-    if (suppliersRes.data) setSuppliers(suppliersRes.data);
-    if (auditLogsRes.data) setAuditLogs(auditLogsRes.data);
+    // Check for errors before processing data
+    const responses = {
+        'itens de estoque': stockItemsRes,
+        'usuários': allUsersRes,
+        'fornecedores': suppliersRes,
+        'logs de auditoria': auditLogsRes,
+        'histórico de itens': historyDataRes,
+    };
+
+    for (const [key, response] of Object.entries(responses)) {
+        if (response.error) {
+            throw new Error(`Falha ao buscar ${key}: ${response.error.message}`);
+        }
+    }
+    
+    // Data Sanitization: Ensure critical numerical fields are valid numbers.
+    const sanitizedStockItems = (stockItemsRes.data || []).map((item: any) => ({
+      ...item,
+      system_stock: Number(item.system_stock) || 0,
+      min_stock: Number(item.min_stock) || 0,
+      value: Number(item.value) || 0,
+    }));
+
+    setStockItems(sanitizedStockItems);
+    setSuppliers(suppliersRes.data || []);
+    setAuditLogs(auditLogsRes.data || []);
     
     if (allUsersRes.data) {
         setUsers(allUsersRes.data as User[]);
@@ -755,14 +772,14 @@ const App: React.FC = () => {
             return acc;
         }, {} as Record<string, ItemHistory[]>);
         setHistoryData(groupedHistory);
+    } else {
+        setHistoryData({});
     }
   }, []);
   
   const loadInitialData = useCallback(async (session: Session) => {
-    setIsDataLoading(true);
     setDataError(null);
     try {
-        // Step 1: Get or create the user profile from the 'users' table.
         const { data: userProfile, error: profileError } = await supabase
             .from('users')
             .select('*')
@@ -771,77 +788,62 @@ const App: React.FC = () => {
 
         let activeUser: User | null = userProfile;
 
-        // If profile doesn't exist (PGRST116: No rows found), create it.
         if (profileError && profileError.code === 'PGRST116') {
-            console.warn(`Profile for user ${session.user.id} not found. Creating a new one.`);
             const { data: newProfile, error: insertError } = await supabase
                 .from('users')
                 .insert({
                     id: session.user.id,
                     email: session.user.email,
                     name: session.user.email?.split('@')[0] || 'Novo Usuário',
-                    profile: 'Operador', // Default to 'Operador'
+                    profile: 'Operador',
                     avatar_url: `https://api.dicebear.com/8.x/initials/svg?seed=${session.user.email}`
                 })
                 .select()
                 .single();
             
-            if (insertError) {
-                throw new Error(`Failed to create user profile: ${insertError.message}`);
-            }
+            if (insertError) throw new Error(`Failed to create user profile: ${insertError.message}`);
             activeUser = newProfile;
         } else if (profileError) {
-            throw profileError; // Rethrow other errors.
+            throw profileError;
         }
 
-        if (!activeUser) {
-            throw new Error("Could not retrieve or create a user profile.");
-        }
+        if (!activeUser) throw new Error("Could not retrieve or create a user profile.");
         
-        setCurrentUser(activeUser); // Set current user immediately
-        
-        // Step 2: Fetch all other application data.
-        await withTimeout(fetchData(activeUser), 15000);
+        setCurrentUser(activeUser);
+        await fetchData(activeUser);
 
-    } catch (error) {
-        const errorMessage = "Falha na conexão com o servidor. Verifique sua internet e tente novamente.";
+    } catch (error: any) {
+        const message = error instanceof Error ? error.message : String(error);
+        const errorMessage = `Falha na conexão com o servidor: ${message}. Verifique sua conexão e as permissões do backend (RLS).`;
         console.error("Falha ao carregar dados ou perfil:", error);
         showToast(errorMessage);
         setDataError(errorMessage);
-    } finally {
-        setIsDataLoading(false);
     }
   }, [fetchData, showToast]);
 
-  // Effect for handling auth state changes (login/logout)
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (session) {
-            setIsLoggedIn(true);
-            await loadInitialData(session);
-        } else {
-            setIsLoggedIn(false);
-            setCurrentUser(null);
-            setStockItems([]);
-            setUsers([]);
-            setSuppliers([]);
-            setAuditLogs([]);
-            setHistoryData({});
-        }
-        setIsAuthLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthLoading(false);
+      if (session) {
+        setIsLoggedIn(true);
+        loadInitialData(session);
+      } else {
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+      }
     });
 
     return () => {
-        subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, [loadInitialData]);
+
 
   const handleRetry = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
         await loadInitialData(session);
     } else {
-        // This case is unlikely if the error screen is shown, but good to handle.
         setIsLoggedIn(false); 
         setIsAuthLoading(false);
     }
@@ -866,10 +868,6 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
 
-  // ============================================================================
-  // Centralized Data Mutation Handlers with Refresh Logic
-  // ============================================================================
-
   const triggerRefresh = async () => {
       if (!currentUser) return;
       setIsRefreshing(true);
@@ -880,7 +878,6 @@ const App: React.FC = () => {
       }
   };
 
-  // User Handlers (profiles, not auth)
     const handleAddUser = async (user: Omit<User, 'id' | 'avatar_url'> & { password?: string }): Promise<{success: boolean, error?: string}> => {
         if (!user.password) return { success: false, error: 'A senha é obrigatória.' };
         
@@ -952,7 +949,6 @@ const App: React.FC = () => {
         }
     };
 
-  // Supplier Handlers
   const handleAddSupplier = async (supplier: Omit<Supplier, 'id'>) => {
     const { error } = await supabase.from('suppliers').insert([supplier]);
     if (error) {
@@ -984,7 +980,6 @@ const App: React.FC = () => {
     }
   };
   
-  // Stock Item Handlers
   const handleAddItem = async (item: Omit<StockItem, 'id' | 'system_stock' | 'suppliers'>) => {
     const { error } = await supabase.from('stock_items').insert({ ...item, system_stock: item.initial_stock });
     if (error) {
@@ -1045,7 +1040,6 @@ const App: React.FC = () => {
       }
   };
 
-  // Movement Handlers
   const handleRegisterEntry = async (data: { itemId: string; quantity: number; supplier: string; nf: string; observations: string; }) => {
       const item = stockItems.find(i => i.id === data.itemId);
       if (!item) { alert('Item não encontrado!'); return; }
@@ -1112,42 +1106,21 @@ const App: React.FC = () => {
   if (!isLoggedIn) {
     return <Login />;
   }
-  
-  const PageWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => (
-     <div className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
-       {children}
-     </div>
-  );
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
-      {isRefreshing && (
-        <div className="fixed inset-0 bg-white bg-opacity-75 z-[9999] flex items-center justify-center" role="status" aria-live="polite">
-            <div className="flex items-center space-x-3 text-gray-700">
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span className="text-lg font-medium">Atualizando...</span>
-            </div>
-        </div>
-      )}
-      <Sidebar onLogout={handleLogout} />
+      {isSidebarOpen && <div className="fixed inset-0 bg-black opacity-50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
+      <Sidebar onLogout={handleLogout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header user={currentUser} stockItems={stockItems} onUpdateAvatar={handleUpdateAvatar} />
-        <main className="flex-1 flex overflow-hidden">
-          {isDataLoading ? (
-             <div className="flex-1 flex flex-col items-center justify-center bg-gray-100 p-6">
-                <Spinner />
-                <p className="mt-4 text-lg text-gray-600">Carregando dados do almoxarifado...</p>
-            </div>
-          ) : dataError ? (
-            <div className="flex-1 flex flex-col items-center justify-center bg-gray-100 p-6 text-center">
+        <Header user={currentUser} stockItems={stockItems} onUpdateAvatar={handleUpdateAvatar} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <main className="flex-1 overflow-y-auto bg-gray-100">
+          {dataError ? (
+            <div className="flex h-full flex-col items-center justify-center p-6 text-center">
                 <svg className="h-16 w-16 text-red-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <h2 className="mt-4 text-2xl font-semibold text-gray-800">Erro ao Carregar Dados</h2>
-                <p className="mt-2 text-gray-600">{dataError}</p>
+                <p className="mt-2 text-gray-600 max-w-xl">{dataError}</p>
                 <button 
                     onClick={handleRetry} 
                     className="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition duration-300"
@@ -1193,6 +1166,17 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+      {isRefreshing && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 z-[9999] flex items-center justify-center" role="status" aria-live="polite">
+            <div className="flex items-center space-x-3 text-gray-700">
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-lg font-medium">Atualizando...</span>
+            </div>
+        </div>
+      )}
       <div className={`toast success ${toastMessage ? 'show' : ''}`}>
         {toastMessage}
       </div>
