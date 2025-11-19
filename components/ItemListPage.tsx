@@ -1,7 +1,8 @@
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { StockItem, Supplier, ItemHistory, WAREHOUSE_CATEGORIES, UNIT_OPTIONS } from '../types';
+import { StockItem, Supplier, ItemHistory, WAREHOUSE_CATEGORIES, UNIT_OPTIONS, User } from '../types';
 
 interface EstoquePageProps {
   stockItems: StockItem[];
@@ -12,6 +13,7 @@ interface EstoquePageProps {
   onBulkAddItems: (items: Omit<StockItem, 'id' | 'system_stock' | 'suppliers'>[]) => Promise<void>;
   onUpdateItem: (itemId: string, itemData: Partial<StockItem>) => Promise<void>;
   onDeleteItem: (item: StockItem) => Promise<void>;
+  user: User | null;
 }
 
 export const EstoquePage: React.FC<EstoquePageProps> = ({
@@ -22,7 +24,8 @@ export const EstoquePage: React.FC<EstoquePageProps> = ({
   onAddItem,
   onBulkAddItems,
   onUpdateItem,
-  onDeleteItem
+  onDeleteItem,
+  user
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -105,6 +108,7 @@ export const EstoquePage: React.FC<EstoquePageProps> = ({
               initial_stock: Number(formData.initial_stock || 0),
               min_stock: Number(formData.min_stock || 0),
               value: Number(formData.value || 0),
+              system_stock: Number(formData.system_stock || 0),
               supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null
           };
 
@@ -211,14 +215,14 @@ export const EstoquePage: React.FC<EstoquePageProps> = ({
 
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-                <table className="w-full text-left min-w-[1600px] table-fixed">
+                <table className="w-full text-left min-w-[1400px] table-fixed">
                     <thead>
                         <tr className="bg-gray-50 border-b">
                             <th className="p-3 w-10"><input type="checkbox" onChange={handleSelectAll} checked={displayedItems.length > 0 && selectedItems.length === displayedItems.length} /></th>
-                            <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Código</th>
+                            <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-28">Código</th>
                             <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Descrição</th>
-                            <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Equipamento</th>
-                            <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Localização</th>
+                            <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-64">Equipamento</th>
+                            <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-48">Localização</th>
                             <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-20">Qtd</th>
                             <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-20">Mín</th>
                             <th className="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-28">Valor</th>
@@ -332,7 +336,16 @@ export const EstoquePage: React.FC<EstoquePageProps> = ({
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700">{editingItem?.id ? 'Estoque Atual' : 'Estoque Inicial'}</label>
-                                                <input type="number" disabled={!!editingItem?.id} value={editingItem?.id ? editingItem.system_stock : (editingItem?.initial_stock || 0)} onChange={e => setEditingItem({...editingItem, initial_stock: Number(e.target.value)})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50" />
+                                                <input 
+                                                    type="number" 
+                                                    disabled={!!editingItem?.id && user?.profile !== 'Administrador'} 
+                                                    value={editingItem?.id ? (editingItem.system_stock || 0) : (editingItem?.initial_stock || 0)} 
+                                                    onChange={e => editingItem?.id ? setEditingItem({...editingItem, system_stock: Number(e.target.value)}) : setEditingItem({...editingItem, initial_stock: Number(e.target.value)})} 
+                                                    className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${!!editingItem?.id && user?.profile !== 'Administrador' ? 'bg-gray-100' : 'bg-white'}`} 
+                                                />
+                                                {!!editingItem?.id && user?.profile === 'Administrador' && (
+                                                    <p className="text-xs text-blue-600 mt-1">Edição permitida para administradores.</p>
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700">Estoque Mínimo</label>

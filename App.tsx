@@ -1009,7 +1009,7 @@ const App: React.FC = () => {
   };
 
   const handleBulkAddItems = async (items: Omit<StockItem, 'id' | 'system_stock' | 'suppliers'>[]) => {
-      const itemsToInsert = items.map(item => ({ ...item, system_stock: 0 }));
+      const itemsToInsert = items.map(item => ({ ...item, system_stock: item.initial_stock || 0 }));
       const { error } = await supabase.from('stock_items').insert(itemsToInsert);
       if (error) {
           showToast(`Erro ao importar itens em massa: ${error.message}`);
@@ -1159,6 +1159,7 @@ const App: React.FC = () => {
                   onBulkAddItems={handleBulkAddItems}
                   onUpdateItem={handleUpdateItem}
                   onDeleteItem={handleDeleteItem}
+                  user={currentUser}
               /></PageWrapper>} />
               <Route path="/estoque/inventario" element={<PageWrapper><InventoryPage 
                   stockItems={stockItems} 
